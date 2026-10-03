@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+Thumbs.db
+*.log
+# Local test footage — do not commit raw swing videos
+*.mov
+*.MOV
+*.mp4
+*.MP4
+tests/fixtures/videos/

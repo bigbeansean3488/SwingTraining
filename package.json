@@ -1,0 +1,12 @@
+{
+  "name": "swing-training",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Local-first baseball swing consistency demo for iPhone Safari (MediaPipe Pose).",
+  "type": "module",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "test": "node --test tests/"
+  },
+  "license": "UNLICENSED"
+}
