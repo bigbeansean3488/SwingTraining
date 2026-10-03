@@ -92,4 +92,99 @@ export async function extractPoseSequence(video, { variant = 'full', start = 0, 
   };
 }
 
+/**
+ * Run pose detection while the video plays (muted), on frames delivered by
+ * requestVideoFrameCallback. Much faster than seeking frame by frame on long
+ * or high-resolution clips. Frames are taken at most every 1/targetFps s of
+ * media time; the playback rate adapts so detection keeps up, but a slow
+ * device can still skip frames, so the effective rate is reported.
+ * Falls back to seeking when requestVideoFrameCallback is unavailable.
+ *
+ * @returns {Promise<import('./landmarks.js').PoseSequence>}
+ */
+export async function extractPoseByPlayback(video, {
+  variant = 'lite', start = 0, end = video.duration, targetFps = 15, videoFps = 30,
+  rate = 1, minRate = 0.1, maxRate = 2, onProgress, signal,
+} = {}) {
+  if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) {
+    return { ...(await extractPoseSequence(video, { variant, start, end, sampleFps: targetFps, onProgress, signal })), method: 'seek' };
+  }
+  const { landmarker, delegate, model } = await getPoseLandmarker(variant);
+  await seekTo(video, start);
+  const frames = [];
+  const interval = 1 / targetFps;
+  const perMediaSecond = Math.min(targetFps, videoFps);
+  let nextT = start;
+  let costMs = null; // EMA of detection time per frame
+  const rates = [];
+  const t0 = performance.now();
+  video.muted = true;
+  video.playbackRate = rate;
+
+  await new Promise((resolve, reject) => {
+    let done = false;
+    let lastProgress = performance.now();
+    const finish = (err) => {
+      if (done) return;
+      done = true;
+      clearInterval(watch);
+      video.removeEventListener('ended', onEnded);
+      video.pause();
+      if (err) reject(err); else resolve();
+    };
+    const onEnded = () => finish();
+    const onFrame = (_now, meta) => {
+      if (done) return;
+      if (signal?.aborted) return finish(new DOMException('Analysis cancelled', 'AbortError'));
+      const mt = meta.mediaTime;
+      if (mt > end + 1e-3) return finish();
+      lastProgress = performance.now();
+      if (mt + 1e-3 >= nextT && mt >= start - 1e-3) {
+        while (nextT <= mt + 1e-3) nextT += interval;
+        const ts = Math.max(tsBase, Math.round(mt * 1000));
+        const c0 = performance.now();
+        const result = landmarker.detectForVideo(video, ts);
+        const c = performance.now() - c0;
+        tsBase = ts + 1;
+        frames.push({ t: round3(mt), lm: fromMediaPipe(result) });
+        costMs = costMs === null ? c : 0.8 * costMs + 0.2 * c;
+        // Detection must take < ~75% of the wall time one media frame lasts.
+        const want = Math.min(maxRate, Math.max(minRate, 750 / (perMediaSecond * costMs)));
+        if (Math.abs(want - video.playbackRate) / video.playbackRate > 0.15) video.playbackRate = want;
+        rates.push(video.playbackRate);
+        onProgress?.(Math.min(1, (mt - start) / Math.max(1e-3, end - start)), frames[frames.length - 1]);
+      }
+      video.requestVideoFrameCallback(onFrame);
+    };
+    // Safari may pause playback (e.g. when the tab is hidden): resume, and
+    // give up if no frame arrives for a long time.
+    const watch = setInterval(() => {
+      if (done) return;
+      if (video.paused && !video.ended) video.play().catch(() => {});
+      if (performance.now() - lastProgress > 10000) finish(new Error('影片播放停止，無法繼續分析。'));
+    }, 1000);
+    video.addEventListener('ended', onEnded);
+    video.requestVideoFrameCallback(onFrame);
+    video.play().catch((err) => finish(err));
+  });
+  video.playbackRate = 1;
+
+  const dts = frames.slice(1).map((f, k) => f.t - frames[k].t).filter((d) => d > 0).sort((a, b) => a - b);
+  const medDt = dts.length ? dts[dts.length >> 1] : interval;
+  return {
+    version: 1,
+    width: video.videoWidth,
+    height: video.videoHeight,
+    sampleFps: Math.round(1 / medDt),
+    start,
+    end,
+    model,
+    delegate,
+    method: 'playback',
+    playbackRate: rates.length ? round3(rates.reduce((a, b) => a + b, 0) / rates.length) : rate,
+    processingMs: Math.round(performance.now() - t0),
+    frames,
+  };
+}
+
 function round3(v) { return Math.round(v * 1000) / 1000; }

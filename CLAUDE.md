@@ -6,6 +6,8 @@ Guidance for Claude Code working in this repo.
 - Discuss with the user in Traditional Chinese (繁體中文). Code, comments, commits, and docs in English.
 - User-facing UI text: Traditional Chinese (Taiwan) with established baseball/technical terms in English
   (Session, Swing, Stride, Hand Path, Baseline, Tracking, Good/Medium/Poor …). See docs/ux.md.
+- Practice workflow: record one video, hit N balls, then analyze — long recordings are segmented into
+  swings automatically (docs/metric-definitions.md §8); single-swing clips still work.
 - UI is practice-first (Setup → Practice → Review). Developer controls (synthetic swings, Pose model,
   environment, diagnostics) live only in 設定 → Developer Tools (or `?debug=1`).
 
@@ -43,7 +45,7 @@ Guidance for Claude Code working in this repo.
 10. Real iPhone validation — **blocked on field footage**. Follow docs/field-validation.md.
 
 ## Hard stop
-Until field footage has been evaluated (docs/field-validation.md F1–F6), do NOT add:
+Until field footage has been evaluated (docs/field-validation.md F1–F6, F10), do NOT add:
 bat detection, ball tracking, impact audio, automatic contact prediction, coaching AI,
 backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real practice footage.
 
@@ -52,5 +54,7 @@ backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real pr
 - `npm test` — unit tests (node:test, synthetic fixtures).
 - `node tools/check-practice.mjs <outDir> [video start end]` — end-to-end practice loop in headless Chrome.
 - `node tools/check-pose.mjs <video> <start> <end> [model] [outDir]` — pose + overlay screenshots.
+- `node tools/check-practice.mjs <outDir> <video> auto` — same, long recording through automatic swing finding.
 - `node tools/evaluate-field.mjs <manifest.csv> <outDir>` — field-validation runner.
+- `node tools/compare-extraction.mjs <video> <start> <end>` — seek vs playback pose extraction (speed, agreement).
 - `node tools/plot-analysis.mjs <out.png> <pose.json | '{"synthetic":{...}}'>` — signals/events plot.

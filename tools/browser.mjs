@@ -20,6 +20,7 @@ export async function openApp({ headless = true } = {}) {
   const browser = await puppeteer.launch({
     executablePath,
     headless,
+    protocolTimeout: 30 * 60000, // pose extraction can keep the page busy for minutes
     args: ['--autoplay-policy=no-user-gesture-required', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   const page = await browser.newPage();

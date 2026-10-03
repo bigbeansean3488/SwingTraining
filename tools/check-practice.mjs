@@ -1,5 +1,6 @@
 // End-to-end check of the practice-first UI in headless Chrome (mobile viewport).
 // Usage: node tools/check-practice.mjs [outDir] [video start end]
+//        node tools/check-practice.mjs [outDir] [video auto]   (long recording: find every swing)
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -61,9 +62,10 @@ try {
   expect(await page.evaluate(() => window.__app.session.focus === 'stride' && window.__app.session.playerName === 'Sean' && window.__app.session.battingSide === 'R'), 'session created with player, side, focus');
 
   // ---------------- Practice (empty)
-  expect(await visible('#next-btn') && /＋ 下一棒/.test(await text('#next-btn')), 'dominant ＋ 下一棒 action visible');
+  expect(await visible('#next-btn') && /＋ 加入影片/.test(await text('#next-btn')), 'dominant ＋ 加入影片 action visible');
+  expect(/連續打 N 球/.test(await text('#practice-result')), 'empty state explains the record-N-swings workflow');
   const nb = await page.$eval('#next-btn', (e) => { const r = e.getBoundingClientRect(); return { h: r.height, bottom: r.bottom, vh: innerHeight }; });
-  expect(nb.h >= 60 && nb.bottom > nb.vh * 0.75, `＋ 下一棒 large and near the bottom (${nb.h}px, bottom ${Math.round(nb.bottom)}/${nb.vh})`);
+  expect(nb.h >= 60 && nb.bottom > nb.vh * 0.75, `＋ 加入影片 large and near the bottom (${nb.h}px, bottom ${Math.round(nb.bottom)}/${nb.vh})`);
   expect(!(await visible('#range-block')) && !(await visible('#range-start')), 'no From/To trim controls by default');
   expect(!(await visible('[data-demo]')), 'no synthetic controls during practice');
   await shot('ui-practice-empty');
@@ -73,6 +75,7 @@ try {
   expect(!(await visible('[data-demo]')), 'Developer Tools hidden until enabled');
   await click('#debug-toggle');
   expect(await visible('[data-demo]') && await visible('#model-variant') && await visible('#env-status'), 'Developer Tools show synthetic swings, Pose model, environment');
+  expect(await page.$eval('#multi-swing-toggle', (e) => e.checked), 'long recordings: automatic swing finding on by default');
   await shot('ui-settings-dev');
   for (const k of ['normal', 'normal', 'normal', 'longStride']) await addDemo(k);
   let res = await text('#practice-result');
@@ -135,6 +138,28 @@ try {
   await shot('ui-review');
   await noOverflow('review');
 
+  // ---------------- Long recording (synthetic): every swing found, labeled in one list
+  await click('.tab[data-tab="settings"]');
+  await click('[data-demo="recording"]');
+  await page.waitForFunction(() => !!window.__app.batch && !document.getElementById('view-practice').hidden, { timeout: 30000 });
+  const bt = await text('#practice-result');
+  const batchRows = await page.$$('#practice-result .batch-row');
+  expect(/這段影片/.test(bt) && /找到 5 棒/.test(bt) && batchRows.length === 5, `recording: 5 swings found and listed (${batchRows.length})`);
+  s = await swings();
+  expect(s.length === 11 && s.slice(6).every((x) => x.valid), 'recording: 5 analyzed swings appended to the session in order');
+  expect(s[7].baselineIds?.includes(s[6].id), 'recording swings compare with the previous ones (Baseline)');
+  const third = s[8].id;
+  await click(`#practice-result .batch-row [data-id="${third}"][data-label="medium"]`);
+  await page.waitForFunction((id) => window.__app.swings.find((x) => x.id === id).contact === 'medium', { timeout: 5000 }, third).catch(() => {});
+  expect((await swings()).find((x) => x.id === third).contact === 'medium', 'recording: label a swing from the list with one tap');
+  expect(await page.$eval(`#practice-result .batch-row [data-id="${third}"][data-label="medium"]`, (e) => e.getAttribute('aria-pressed') === 'true' && getComputedStyle(e.querySelector('.zh'), '::before').content.includes('✓')), 'recording: selected label shows ✓, not color only');
+  const rowBtn = await page.$eval('#practice-result .batch-row .contact-btn', (e) => e.getBoundingClientRect().height);
+  expect(rowBtn >= 44, `recording: label buttons are touch-sized (${rowBtn}px)`);
+  await shot('ui-recording');
+  await noOverflow('recording');
+  await click('#practice-result [data-action="closeBatch"]');
+  expect(/Swing #11/.test(await text('#practice-result')), 'recording: 完成 returns to the newest result');
+
   const allText = await page.evaluate(() => document.body.innerText);
   expect(!SIMPLIFIED.test(allText), 'no Simplified Chinese characters in UI text');
 
@@ -160,28 +185,42 @@ try {
     await page.type('#player-name', 'Video');
     await click('#start-session');
     await page.waitForFunction(() => !!window.__app.session);
-    await page.evaluate(() => { window.__swingDebug = undefined; });
+    const auto = vStart === 'auto';
+    await page.evaluate((a) => { window.__swingDebug = undefined; window.__app.multiSwing = a; }, auto);
     const input = await page.$('#video-input');
     await input.uploadFile(videoPath);
     await page.waitForFunction(() => window.__swingDebug?.meta || window.__swingDebug?.error, { timeout: 60000 });
-    if (await visible('#range-block')) {
-      expect(/影片較長，請選擇要分析的 Swing/.test(await text('#practice-status')), 'long clip: simple chooser shown');
+    if (auto) {
+      await page.waitForFunction(() => window.__app.status?.stage === 'scan', { timeout: 60000 }).catch(() => {});
+      if (await page.evaluate(() => window.__app.status?.stage === 'scan')) {
+        expect(/找出每一棒/.test(await text('#practice-status')) && await visible('[data-action="stopAnalysis"]'), 'recording: scan stage shown with 停止分析');
+        await shot('ui-recording-scan');
+      }
+      await page.waitForFunction(() => window.__swingDebug?.batchDone, { timeout: 120 * 60000, polling: 2000 });
+      const d = await page.evaluate(() => ({ seg: window.__swingDebug.segmentation, scan: window.__swingDebug.scan, err: window.__swingDebug.poseError, swings: window.__app.swings.map((x) => ({ n: x.number, window: x.video.window, status: x.analysis.status, reason: x.analysis.reason, qc: x.poseQuality?.level, ms: x.video.processingMs })) }));
+      console.log('recording:', JSON.stringify(d, null, 1));
+      expect(!d.err, 'recording analyzed without errors');
+      await shot('ui-recording-real');
+    } else if (await visible('#range-block')) {
+      expect(/請選擇要分析的 Swing/.test(await text('#practice-status')), 'long clip: simple chooser shown');
       const btn = await page.$eval('#analyze-here', (e) => { const r = e.getBoundingClientRect(); return { bottom: r.bottom, vh: innerHeight }; });
       expect(!(await visible('#next-btn')) && btn.bottom <= btn.vh, `long clip: 分析這個位置 is the visible primary action (bottom ${Math.round(btn.bottom)}/${btn.vh})`);
       await shot('ui-long-clip');
       await page.evaluate((a, b) => { document.getElementById('range-start').value = a; document.getElementById('range-end').value = b; document.getElementById('analyze-btn').click(); }, vStart, vEnd);
     }
-    await page.waitForFunction(() => window.__app.status?.stage === 'track', { timeout: 60000 }).catch(() => {});
+    if (!auto) await page.waitForFunction(() => window.__app.status?.stage === 'track', { timeout: 60000 }).catch(() => {});
     if (await page.evaluate(() => window.__app.status?.stage === 'track')) {
       expect(/正在分析這一棒/.test(await text('#practice-status')) && /Pose Tracking/.test(await text('#practice-status')), 'analysis shows real stages');
       await shot('ui-analyzing');
     }
-    await page.waitForFunction(() => window.__swingDebug?.recordId || window.__swingDebug?.poseError, { timeout: 20 * 60000, polling: 1000 });
-    const dbg = await page.evaluate(() => ({ err: window.__swingDebug.poseError, status: window.__swingDebug.analysis?.status }));
-    console.log('real video:', JSON.stringify(dbg));
-    expect(!dbg.err, 'real video analyzed');
-    expect(/Swing #1/.test(await text('#practice-result')), 'real-video result shown as newest swing');
-    await shot('ui-real-video');
+    if (!auto) {
+      await page.waitForFunction(() => window.__swingDebug?.recordId || window.__swingDebug?.poseError, { timeout: 20 * 60000, polling: 1000 });
+      const dbg = await page.evaluate(() => ({ err: window.__swingDebug.poseError, status: window.__swingDebug.analysis?.status }));
+      console.log('real video:', JSON.stringify(dbg));
+      expect(!dbg.err, 'real video analyzed');
+      expect(/Swing #1/.test(await text('#practice-result')), 'real-video result shown as newest swing');
+      await shot('ui-real-video');
+    }
   }
   const pageErrors = logs.filter((l) => l.startsWith('[pageerror]'));
   expect(!pageErrors.length, `no uncaught page errors${pageErrors.length ? `: ${pageErrors.join(' | ')}` : ''}`);

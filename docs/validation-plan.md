@@ -36,9 +36,21 @@ Protocol and footage requirements: [field-validation.md](field-validation.md).
    on synthetic data; whether this matches what coaches mean by "head
    stability" is open (F9).
 5. **Consistency score scale** is provisional (half-score values) — F7.
+6. **Playback scan timing** (`tools/compare-extraction.mjs`, IMG_4841.MOV
+   5–7 s, headless Chrome with software GL): detection could not keep up even
+   at playback rate 0.1 (16 of 30 target fps), and playback landmarks best
+   matched seek frames 0.2–0.3 s *earlier* than their reported media time.
+   Decision: the playback scan only locates swings (windows have ≥ 1.5 s
+   margin); all metrics come from seek-per-frame extraction. Re-measure on
+   iPhone Safari (F8/F10) — if playback is frame-accurate there it could
+   replace the slower second pass, but only with that evidence.
+7. **Segmentation false positives**: dry swings, check swings and (in the
+   generic clip) throws are fast hand motions and will be listed as swings.
+   The list makes deleting them one tap away; no classifier is added before
+   field data (hard stop).
 
 ## Field log
 
 _Add one entry per footage session: date, conditions, manifest, `summary.txt`
-output, F1–F9 outcomes, failures observed, changes made (with the evidence
+output, F1–F10 outcomes, failures observed, changes made (with the evidence
 that motivated each change)._

@@ -10,10 +10,11 @@ export const DEMOS = [
   ['handPath', 'Different hand path'],
   ['late', 'Later timing'],
   ['badTracking', 'Tracking failure'],
+  ['recording', 'Recording ×5 swings'],
 ];
 
 /**
- * @param model { session, swings, players, sessions, debug, model: poseModel, env, diag, version }
+ * @param model { session, swings, players, sessions, debug, poseModel, multiSwing, env, diag, version }
  */
 export function renderSettings(el, m) {
   el.innerHTML = `
@@ -59,8 +60,12 @@ export function renderSettings(el, m) {
             ${['lite', 'full', 'heavy'].map((v) => `<option value="${v}" ${m.poseModel === v ? 'selected' : ''}>${v}${v === 'full' ? '（預設）' : v === 'lite' ? '（較快）' : '（較慢）'}</option>`).join('')}
           </select></label>
 
-        <h3>手動分析時間</h3>
-        <p class="muted small">長影片可在選片後的「進階」設定秒數。</p>
+        <h3>長影片（超過 10 秒）</h3>
+        <label class="switch-row">
+          <input type="checkbox" id="multi-swing-toggle" data-action="toggleMultiSwing" ${m.multiSwing ? 'checked' : ''} />
+          <span>自動找出每一棒</span>
+        </label>
+        <p class="muted small">關閉時改為手動拖到一棒再分析（「進階」可設定秒數）。</p>
 
         <h3>Environment</h3>
         <p class="small mono" id="env-status">${esc(m.env)}</p>

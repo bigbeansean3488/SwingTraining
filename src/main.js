@@ -1,12 +1,14 @@
 // Entry point / controller for the practice-first UI.
-//   訓練: Setup (no session) → Practice loop (＋ 下一棒 → auto analysis → result → Contact → ＋ 下一棒)
+//   訓練: Setup (no session) → Practice loop (＋ 加入影片 → one swing (short clip) or every swing
+//         of a long recording → result(s) → Contact → ＋ 加入影片)
 //   紀錄: Review of the current session
 //   設定: session/player/data management + Developer Tools (debug)
 // Analysis logic lives in src/analysis and must not import from src/ui.
 import { loadVideoFile, probeFrameRate } from './ui/video.js';
-import { extractPoseSequence } from './pose/mediapipe.js';
+import { extractPoseSequence, extractPoseByPlayback } from './pose/mediapipe.js';
 import { drawSkeleton, syncCanvas, nearestFrameIndex } from './ui/skeleton.js';
 import { analyzeSwing } from './analysis/pipeline.js';
+import { findSwings, sliceSequence } from './analysis/segmentation.js';
 import {
   createSession, createSwingRecord, setContactLabel, recomputeSession, exportSession,
   updatePlayers, playersFromSessions, sessionFocus, FOCUS_KEYS,
@@ -16,17 +18,19 @@ import { openStore } from './storage/indexedDb.js';
 import { $, delegate } from './ui/dom.js';
 import { openDialog } from './ui/dialog.js';
 import { renderSetup, GUEST } from './ui/views/setup.js';
-import { renderStatus, renderResult, renderRecent } from './ui/views/practice.js';
+import { renderStatus, renderResult, renderRecent, renderBatch } from './ui/views/practice.js';
 import { renderReview } from './ui/views/review.js';
 import { renderDetail } from './ui/views/detail.js';
 import { renderSettings } from './ui/views/settings.js';
 import { generateSwing, dropFrames } from './synthetic/swing.js';
 import { naturalVariation } from './synthetic/session.js';
+import { generatePractice, decimate } from './synthetic/practice.js';
 
-export const APP_VERSION = '0.10.0';
+export const APP_VERSION = '0.11.0';
 const AUTO_ANALYZE_MAX_S = 10;
 const PRE_ROLL_S = 3; // "分析這個位置": window = [t − 3 s, t + 2 s]
 const POST_ROLL_S = 2;
+const SCAN = { variant: 'lite', targetFps: 15 }; // coarse pass that only locates swings
 
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -41,12 +45,15 @@ const state = {
   players: [],
   tab: 'train',
   setup: { name: '', side: 'R', focus: 'motion' },
-  status: null, // { stage: 'load'|'choose'|'track'|'compute', progress } | { error }
+  status: null, // { stage: 'load'|'choose'|'track'|'scan'|'batch', progress, index, total } | { error, manual }
   videoPanel: false,
   detailId: null,
   debug: new URLSearchParams(location.search).get('debug') === '1' || ls.get('swingtraining.debug') === '1',
   poseModel: ls.get('swingtraining.model') || 'full',
-  video: { meta: null, fpsInfo: null, pose: null, recordId: null },
+  video: { meta: null, fpsInfo: null, pose: null, recordId: null, poses: {} },
+  batch: null, // { ids, found, skipped, stopped } — swings found in the last long recording
+  multiSwing: ls.get('swingtraining.multiSwing') !== '0', // long recordings: find every swing (false: choose one manually)
+  abort: null,
   busy: false,
   lastDiag: null,
 };
@@ -121,7 +128,7 @@ function render() {
   if (t === 'settings') {
     renderSettings($('view-settings'), {
       session: state.session, swings: state.swings, players: state.players, sessions: state.sessions,
-      debug: state.debug, poseModel: state.poseModel, env: state.debug ? envSummary() : '', diag: state.debug ? diagSummary() : '', version: APP_VERSION,
+      debug: state.debug, poseModel: state.poseModel, multiSwing: state.multiSwing, env: state.debug ? envSummary() : '', diag: state.debug ? diagSummary() : '', version: APP_VERSION,
     });
   }
   renderSheet();
@@ -136,6 +143,7 @@ function renderPractice() {
   // While a new swing is being analyzed, don't show the previous result as if it were current.
   const res = $('practice-result');
   if (busy) res.innerHTML = '';
+  else if (state.batch) renderBatch(res, state.batch, state.swings, focus(), { playable: state.video.poses });
   else renderResult(res, n, focus(), state.swings.slice(0, -1), { showVideoButton: !!n && n.id === state.video.recordId });
   renderRecent($('practice-recent'), state.swings, focus());
 }
@@ -146,7 +154,7 @@ function renderNextButton() {
   btn.classList.toggle('is-busy', busy);
   btn.setAttribute('aria-disabled', String(busy));
   $('video-input').disabled = busy;
-  $('next-btn-text').textContent = busy ? '分析中…' : '＋ 下一棒';
+  $('next-btn-text').textContent = busy ? '分析中…' : '＋ 加入影片';
 }
 
 function renderSheet() {
@@ -362,7 +370,8 @@ async function onFileSelected(file) {
   if (state.busy || !state.session) return;
   state.busy = true;
   state.tab = 'train';
-  state.video = { meta: null, fpsInfo: null, pose: null, recordId: null };
+  state.batch = null;
+  state.video = { meta: null, fpsInfo: null, pose: null, recordId: null, poses: {} };
   state.videoPanel = true;
   render();
   setStatus({ stage: 'load' });
@@ -384,45 +393,71 @@ async function onFileSelected(file) {
   window.__swingDebug = { meta, fpsInfo: fps };
   drawVideoOverlay();
   if (meta.duration > AUTO_ANALYZE_MAX_S) {
-    state.busy = false;
-    $('range-start').value = '0';
-    $('range-end').value = Math.min(meta.duration, 8).toFixed(1);
-    setStatus({ stage: 'choose' });
+    if (state.multiSwing) await analyzeRecording();
+    else chooseManually();
     return;
   }
   await analyzeVideo(0, meta.duration);
 }
 
-async function analyzeVideo(start, end) {
+/** Long clip, manual mode: the user scrubs to one swing. */
+function chooseManually() {
+  state.busy = false;
+  state.batch = null;
+  state.videoPanel = true;
+  $('range-start').value = '0';
+  $('range-end').value = Math.min(state.video.meta.duration, 8).toFixed(1);
+  setStatus({ stage: 'choose' });
+}
+
+function analysisFps() {
+  const fpsInfo = state.video.fpsInfo;
+  return window.__forceSampleFps || (fpsInfo?.reliable ? Math.min(60, Math.round(fpsInfo.fps)) : 30);
+}
+
+/** Exact (seek-per-frame) pose extraction of [start, end] → analysis → swing record. */
+async function analyzeWindow(start, end, { onProgress, signal, segment } = {}) {
   const video = $('video');
   const meta = state.video.meta;
-  if (!meta || !(end > start)) return;
   const fpsInfo = state.video.fpsInfo;
-  const sampleFps = window.__forceSampleFps || (fpsInfo?.reliable ? Math.min(60, Math.round(fpsInfo.fps)) : 30);
+  const sampleFps = analysisFps();
+  const seq = await extractPoseSequence(video, {
+    variant: state.poseModel, start, end, sampleFps, signal,
+    onProgress: (p, frame) => {
+      onProgress?.(p);
+      syncCanvas($('overlay'), video);
+      drawSkeleton($('overlay'), frame.lm);
+    },
+  });
+  const analysis = analyzeSwing(seq);
+  const record = await addSwing({
+    seq,
+    analysis,
+    video: {
+      name: meta.name, sizeBytes: meta.sizeBytes, duration: meta.duration, width: meta.width, height: meta.height,
+      fps: fpsInfo?.reliable ? fpsInfo.fps : null, window: [start, end], model: seq.model, delegate: seq.delegate,
+      processingMs: seq.processingMs, ...(segment ? { segment } : {}),
+    },
+  });
+  state.video.poses[record.id] = seq;
+  state.lastDiag = { status: analysis.status, reason: analysis.reason, qc: analysis.qc?.level, frames: seq.frames.length, sampleFps, processingMs: seq.processingMs, delegate: seq.delegate };
+  return { seq, analysis, record };
+}
+
+/** One swing: the whole short clip, or a window chosen in a long clip. */
+async function analyzeVideo(start, end) {
+  const video = $('video');
+  if (!state.video.meta || !(end > start)) return;
   state.busy = true;
+  state.batch = null;
   setStatus({ stage: 'track', progress: 0 });
   video.pause();
   try {
-    const seq = await extractPoseSequence(video, {
-      variant: state.poseModel, start, end, sampleFps,
-      onProgress: (p, frame) => {
-        state.status = { stage: 'track', progress: p };
-        renderStatus($('practice-status'), state.status);
-        syncCanvas($('overlay'), video);
-        drawSkeleton($('overlay'), frame.lm);
-      },
+    const { seq, analysis, record } = await analyzeWindow(start, end, {
+      onProgress: (p) => { state.status = { stage: 'track', progress: p }; renderStatus($('practice-status'), state.status); },
     });
     state.video.pose = seq;
-    setStatus({ stage: 'compute' });
-    await new Promise((r) => setTimeout(r, 0)); // let the stage render
-    const analysis = analyzeSwing(seq);
-    const record = await addSwing({
-      seq,
-      analysis,
-      video: { name: meta.name, sizeBytes: meta.sizeBytes, duration: meta.duration, width: meta.width, height: meta.height, fps: fpsInfo?.reliable ? fpsInfo.fps : null, window: [start, end], model: seq.model, delegate: seq.delegate, processingMs: seq.processingMs },
-    });
     state.video.recordId = record.id;
-    state.lastDiag = { status: analysis.status, reason: analysis.reason, qc: analysis.qc?.level, frames: seq.frames.length, sampleFps, processingMs: seq.processingMs, delegate: seq.delegate };
     window.__swingDebug = { ...window.__swingDebug, pose: seq, analysis, recordId: record.id };
     video.currentTime = analysis.events?.motionStart ?? start;
     state.status = null;
@@ -436,6 +471,105 @@ async function analyzeVideo(start, end) {
     render();
     window.scrollTo(0, 0);
   }
+}
+
+/**
+ * Long recording with several swings ("錄一段、打 N 球"):
+ *   1. quick scan while the video plays (lite model, ~15 fps) to find swings,
+ *   2. exact per-swing analysis of each window, in recording order.
+ * The scan's landmarks only locate swings; they are never used for metrics.
+ */
+async function analyzeRecording() {
+  const video = $('video');
+  const meta = state.video.meta;
+  const ctrl = new AbortController();
+  state.abort = ctrl;
+  state.busy = true;
+  setStatus({ stage: 'scan', progress: 0 });
+  const ids = [];
+  let found = [];
+  let skipped = [];
+  try {
+    const scan = await extractPoseByPlayback(video, {
+      ...SCAN, start: 0, end: meta.duration, signal: ctrl.signal,
+      videoFps: state.video.fpsInfo?.reliable ? state.video.fpsInfo.fps : 30,
+      onProgress: (p, frame) => {
+        state.status = { stage: 'scan', progress: p };
+        renderStatus($('practice-status'), state.status);
+        syncCanvas($('overlay'), video);
+        drawSkeleton($('overlay'), frame.lm);
+      },
+    });
+    const seg = findSwings(scan);
+    found = seg.swings;
+    skipped = seg.rejected;
+    window.__swingDebug = {
+      ...window.__swingDebug,
+      scan: { frames: scan.frames.length, sampleFps: scan.sampleFps, processingMs: scan.processingMs, method: scan.method, playbackRate: scan.playbackRate },
+      segmentation: { ok: seg.ok, reason: seg.reason ?? null, swings: found, rejected: skipped },
+    };
+    state.lastDiag = { scan: window.__swingDebug.scan, segmentation: window.__swingDebug.segmentation };
+    if (!found.length) {
+      state.status = { error: seg.ok ? '這段影片中沒有找到揮棒動作。' : '這段影片中沒有偵測到人。', manual: true };
+      state.videoPanel = true;
+      return;
+    }
+    for (const [i, cand] of found.entries()) {
+      const at = { stage: 'batch', index: i, total: found.length, progress: 0 };
+      setStatus(at);
+      const { record } = await analyzeWindow(cand.window[0], cand.window[1], {
+        signal: ctrl.signal,
+        segment: { index: i + 1, of: found.length, peak: cand.peak, peakSpeed: cand.peakSpeed },
+        onProgress: (p) => { state.status = { ...at, progress: p }; renderStatus($('practice-status'), state.status); },
+      });
+      ids.push(record.id);
+      renderRecent($('practice-recent'), state.swings, focus());
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error(err);
+      state.status = { error: `分析失敗：${err.message}` };
+      window.__swingDebug = { ...window.__swingDebug, poseError: err.message };
+    }
+  } finally {
+    const stopped = ctrl.signal.aborted;
+    state.abort = null;
+    state.busy = false;
+    if (found.length && (ids.length || stopped)) {
+      state.batch = { ids, found: found.length, skipped: skipped.length, stopped };
+      state.status = null;
+      state.videoPanel = false;
+    } else if (stopped) {
+      state.status = null;
+      state.videoPanel = false;
+    }
+    window.__swingDebug = { ...window.__swingDebug, recordIds: ids, batchDone: true };
+    render();
+    window.scrollTo(0, 0);
+  }
+}
+
+/** Replay one swing of the current recording (with its skeleton) in the video panel. */
+function playSegment(id) {
+  const sw = state.swings.find((s) => s.id === id);
+  const seq = state.video.poses[id];
+  const video = $('video');
+  if (!sw || !seq) return;
+  state.video.pose = seq;
+  state.videoPanel = true;
+  renderPractice();
+  const ev = sw.analysis?.events;
+  const from = ev?.motionStart != null ? Math.max(seq.start, ev.motionStart - 0.5) : seq.start;
+  const to = ev?.swingEnd != null ? Math.min(seq.end, ev.swingEnd + 0.5) : seq.end;
+  $('video-panel').scrollIntoView({ block: 'nearest' });
+  const stop = () => {
+    if (video.currentTime < to) return;
+    video.pause();
+    video.removeEventListener('timeupdate', stop);
+  };
+  video.currentTime = from;
+  video.addEventListener('timeupdate', stop);
+  video.play().catch(() => {});
 }
 
 // ---------------------------------------------------------------- synthetic (Developer Tools)
@@ -459,6 +593,38 @@ async function addDemoSwing(kind) {
   const analysis = analyzeSwing(seq);
   await addSwing({ seq, analysis, video: { synthetic: true, label: d.label, width: seq.width, height: seq.height, fps: seq.sampleFps } });
   state.lastDiag = { status: analysis.status, reason: analysis.reason, qc: analysis.qc?.level, synthetic: d.label };
+  state.tab = 'train';
+  state.status = null;
+  state.videoPanel = false;
+  render();
+  window.scrollTo(0, 0);
+}
+
+/**
+ * Synthetic long recording: 5 swings with walking / leaving the frame in
+ * between, run through the same segmentation → per-window analysis as a real
+ * recording (coarse 15 fps scan, full-rate windows). No video, so no replay.
+ */
+async function addDemoRecording() {
+  if (!state.session || state.busy) return;
+  const k = state.swings.length;
+  const seq = generatePractice({
+    swings: Array.from({ length: 5 }, (_, i) => ({ ...naturalVariation(k + i), ...(i === 3 ? { strideLength: 1.4 } : {}) })),
+    distractors: [{ type: 'walk', t0: 5, t1: 7.5, dx: 1.5 }, { type: 'leave', t0: 19, t1: 21 }],
+    seed: 500 + k,
+  });
+  const seg = findSwings(decimate(seq, 4));
+  const ids = [];
+  for (const [i, cand] of seg.swings.entries()) {
+    const win = sliceSequence(seq, ...cand.window);
+    delete win.truth;
+    const analysis = analyzeSwing(win);
+    const record = await addSwing({ seq: win, analysis, video: { synthetic: true, label: `recording ${i + 1}/${seg.swings.length}`, width: seq.width, height: seq.height, fps: seq.sampleFps, window: cand.window, segment: { index: i + 1, of: seg.swings.length, peak: cand.peak } } });
+    ids.push(record.id);
+  }
+  state.batch = { ids, found: seg.swings.length, skipped: seg.rejected.length, stopped: false };
+  state.lastDiag = { synthetic: 'recording', segmentation: { swings: seg.swings, rejected: seg.rejected } };
+  window.__swingDebug = { segmentation: { swings: seg.swings }, recordIds: ids, batchDone: true };
   state.tab = 'train';
   state.status = null;
   state.videoPanel = false;
@@ -534,6 +700,10 @@ function bindEvents() {
     toggleVideo: () => { state.videoPanel = !state.videoPanel; renderPractice(); if (state.videoPanel) $('video-panel').scrollIntoView({ block: 'nearest' }); },
     exclude: ({ id }, el) => updateSwing(id, (s) => ({ ...s, excludeFromBaseline: el.checked }), true),
     deleteSwing: ({ id }) => deleteSwing(id),
+    playSegment: ({ id }) => playSegment(id),
+    closeBatch: () => { state.batch = null; render(); window.scrollTo(0, 0); },
+    stopAnalysis: () => state.abort?.abort(),
+    chooseManual: () => chooseManually(),
     resume: ({ id }) => resumeSession(id),
   };
   delegate($('view-practice'), swingActions);
@@ -558,7 +728,11 @@ function bindEvents() {
       ls.set('swingtraining.debug', state.debug ? '1' : '0');
       render();
     },
-    demo: (d) => addDemoSwing(d.demo),
+    toggleMultiSwing: (_d, el) => {
+      state.multiSwing = el.checked;
+      ls.set('swingtraining.multiSwing', state.multiSwing ? '1' : '0');
+    },
+    demo: (d) => (d.demo === 'recording' ? addDemoRecording() : addDemoSwing(d.demo)),
   });
   $('view-settings').addEventListener('change', (e) => {
     if (e.target.id === 'model-variant') {

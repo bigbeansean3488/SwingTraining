@@ -3,10 +3,14 @@
 // write per-swing results + a normal-vs-perturbed summary.
 //
 // Usage: node tools/evaluate-field.mjs <manifest.csv> <outDir> [model=full]
-//   manifest columns: file,condition,start,end,lighting,distance_m,note
+//   manifest columns: file,condition,start,end,lighting,distance_m,note[,expected_swings]
 //   - file is relative to the manifest's folder
 //   - condition: normal | longStride | shortStride | head | timing | other
-//   - start/end (s) optional; required for clips longer than 10 s
+//   - start/end (s) optional: analyze exactly that window as one swing.
+//     Clips longer than 10 s without start/end are treated as a practice
+//     recording: every swing is found automatically and each one becomes a
+//     row (the condition applies to all of them). Set expected_swings to the
+//     true number of swings to check segmentation.
 // See docs/field-validation.md.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +33,7 @@ const baseDir = path.dirname(path.resolve(manifestPath));
 const rows = parseCsv(fs.readFileSync(manifestPath, 'utf8'));
 const { page, logs, close } = await openApp();
 const results = [];
+const segRows = [];
 try {
   await startSession(page, `field ${path.basename(manifestPath)}`);
   await page.evaluate((m) => { window.__app.poseModel = m; }, model);
@@ -36,7 +41,8 @@ try {
     const file = path.join(baseDir, row.file);
     if (!fs.existsSync(file)) { console.log(`SKIP ${row.file}: not found`); continue; }
     process.stdout.write(`[${i + 1}/${rows.length}] ${row.file} (${row.condition}) … `);
-    await page.evaluate(() => { window.__swingDebug = undefined; });
+    const manual = !!(row.start && row.end);
+    await page.evaluate((m) => { window.__swingDebug = undefined; window.__app.multiSwing = !m; }, manual);
     const input = await page.$('#video-input');
     await input.uploadFile(file);
     await page.waitForFunction(() => window.__swingDebug?.meta || window.__swingDebug?.error, { timeout: 120000 });
@@ -44,46 +50,59 @@ try {
     if (loadErr) { console.log(`load error: ${loadErr}`); results.push({ ...row, error: loadErr }); continue; }
     const needsRange = await page.$eval('#range-block', (e) => !e.hidden);
     if (needsRange) {
-      if (!row.start || !row.end) { console.log('clip > 10 s: set start/end in the manifest'); results.push({ ...row, error: 'missing start/end' }); continue; }
       await page.evaluate((a, b) => { document.getElementById('range-start').value = a; document.getElementById('range-end').value = b; document.getElementById('analyze-btn').click(); }, row.start, row.end);
     }
-    await page.waitForFunction(() => window.__swingDebug?.recordId || window.__swingDebug?.poseError, { timeout: 30 * 60000, polling: 500 });
-    const rec = await page.evaluate(() => {
+    await page.waitForFunction(() => window.__swingDebug?.recordId || window.__swingDebug?.batchDone || window.__swingDebug?.poseError, { timeout: 120 * 60000, polling: 1000 });
+    const out = await page.evaluate(() => {
       const d = window.__swingDebug;
-      if (d.poseError) return { error: d.poseError };
-      const s = window.__app.swings.find((x) => x.id === d.recordId);
-      const m = s.analysis.metrics;
-      return {
-        number: s.number,
-        fps: s.video.fps,
-        processingS: s.video.processingMs / 1000,
-        status: s.analysis.status,
-        reason: s.analysis.reason,
-        qc: s.poseQuality?.level,
-        qcReasons: (s.poseQuality?.reasons || []).join('; '),
-        consistency: s.consistency?.score ?? null,
-        head: m?.headStability.value ?? null,
-        headAnchored: m?.headStability.diagnostics.maxDisplacementAnchored ?? null,
-        stride: m?.stride.value ?? null,
-        startToPeak: m?.timing.value.startToPeak ?? null,
-        plantToPeak: m?.timing.value.plantToPeak ?? null,
-        devHead: s.deviations?.head ?? null,
-        devStride: s.deviations?.stride ?? null,
-        devTiming: s.deviations?.timing ?? null,
-        devWristPath: s.deviations?.wristPath ?? null,
-        devPose: s.deviations?.pose ?? null,
-        swing: s,
-      };
+      const ids = d.recordIds ?? (d.recordId ? [d.recordId] : []);
+      const recs = ids.map((id) => {
+        const s = window.__app.swings.find((x) => x.id === id);
+        const m = s.analysis.metrics;
+        return {
+          number: s.number,
+          window: s.video.window ? s.video.window.map((v) => v.toFixed(2)).join('-') : '',
+          fps: s.video.fps,
+          processingS: s.video.processingMs / 1000,
+          status: s.analysis.status,
+          reason: s.analysis.reason,
+          qc: s.poseQuality?.level,
+          qcReasons: (s.poseQuality?.reasons || []).join('; '),
+          consistency: s.consistency?.score ?? null,
+          head: m?.headStability.value ?? null,
+          headAnchored: m?.headStability.diagnostics.maxDisplacementAnchored ?? null,
+          stride: m?.stride.value ?? null,
+          startToPeak: m?.timing.value.startToPeak ?? null,
+          plantToPeak: m?.timing.value.plantToPeak ?? null,
+          devHead: s.deviations?.head ?? null,
+          devStride: s.deviations?.stride ?? null,
+          devTiming: s.deviations?.timing ?? null,
+          devWristPath: s.deviations?.wristPath ?? null,
+          devPose: s.deviations?.pose ?? null,
+          swing: s,
+        };
+      });
+      return { error: d.poseError ?? null, recs, segmentation: d.segmentation ?? null, scan: d.scan ?? null };
     });
-    console.log(rec.error ? `error: ${rec.error}` : `${rec.status} qc=${rec.qc} consistency=${rec.consistency ?? '—'}`);
-    results.push({ ...row, ...rec });
+    if (out.segmentation) {
+      const found = out.segmentation.swings.length;
+      const expected = row.expected_swings ? Number(row.expected_swings) : null;
+      segRows.push({ file: row.file, expected, found, peaks: out.segmentation.swings.map((x) => x.peak) });
+      console.log(`found ${found} swing(s)${expected !== null ? ` (expected ${expected})` : ''}; scan ${out.scan ? `${out.scan.frames} frames in ${(out.scan.processingMs / 1000).toFixed(0)} s` : '—'}`);
+    }
+    if (out.error) { console.log(`error: ${out.error}`); results.push({ ...row, error: out.error }); continue; }
+    if (!out.recs.length) results.push({ ...row, error: 'no swing found' });
+    for (const rec of out.recs) {
+      console.log(`  #${rec.number} ${rec.window} ${rec.status} qc=${rec.qc} consistency=${rec.consistency ?? '—'}`);
+      results.push({ ...row, ...rec });
+    }
   }
 } finally {
   await close();
 }
 
 // ---- outputs
-const cols = ['number', 'file', 'condition', 'lighting', 'distance_m', 'fps', 'processingS', 'status', 'qc', 'reason', 'qcReasons', 'consistency', 'head', 'headAnchored', 'stride', 'startToPeak', 'plantToPeak', 'devHead', 'devStride', 'devTiming', 'devWristPath', 'devPose', 'error'];
+const cols = ['number', 'file', 'window', 'condition', 'lighting', 'distance_m', 'fps', 'processingS', 'status', 'qc', 'reason', 'qcReasons', 'consistency', 'head', 'headAnchored', 'stride', 'startToPeak', 'plantToPeak', 'devHead', 'devStride', 'devTiming', 'devWristPath', 'devPose', 'error'];
 const csvCell = (v) => (v === null || v === undefined ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
 fs.writeFileSync(path.join(outDir, 'results.csv'), [cols.join(','), ...results.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n'));
 fs.writeFileSync(path.join(outDir, 'swings.json'), JSON.stringify(results.map((r) => r.swing).filter(Boolean)));
@@ -105,6 +124,7 @@ for (const [cond, key] of Object.entries(target)) {
 const scoreN = valid.filter((r) => r.condition === 'normal' && r.consistency !== null).map((r) => r.consistency);
 const scoreP = valid.filter((r) => r.condition !== 'normal' && r.consistency !== null).map((r) => r.consistency);
 lines.push(`consistency: normal median ${med(scoreN)} (n=${scoreN.length}); perturbed median ${med(scoreP)} (n=${scoreP.length})`);
+for (const r of segRows) lines.push(`segmentation ${r.file}: found ${r.found}${r.expected !== null ? ` / expected ${r.expected}` : ''} at ${r.peaks.join(', ')} s`);
 fs.writeFileSync(path.join(outDir, 'summary.txt'), `${lines.join('\n')}\n`);
 console.log(`\n${lines.join('\n')}\nwrote ${outDir}/results.csv, swings.json, summary.txt`);
 const pageErrors = logs.filter((l) => l.startsWith('[pageerror]'));

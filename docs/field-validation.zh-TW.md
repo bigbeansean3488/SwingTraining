@@ -26,7 +26,7 @@ V0 目前所有功能**最多只到 `UNIT_VALIDATED`**（用合成資料驗證�
 | 距離 | 全身（含雙腳）、收棒時的雙手、整個跨步都要完整在畫面內並留邊。先從約 5–7 公尺開始，並記下實際距離 |
 | 方向 | 建議**橫拍**（跨步比較有空間），並記錄是橫拍或直拍 |
 | 格式 | 如果可以，用 **1080p / 60 fps**（設定 → 相機 → 錄影）；若用了 4K/30 或慢動作 120/240 fps 也要記下來 |
-| 片長 | **一支影片只拍一次揮棒**。揮棒前**至少 1 秒**就開始錄，收棒後約 1 秒停止（10 秒以內的影片會自動分析） |
+| 片長 | **一組揮棒錄成一支影片**（例如連續打 10 球，每球間隔 4 秒以上；App 會自動找出每一棒）。第一棒前至少 2 秒就開始錄。另外也拍幾支**單棒短片**（10 秒內，揮棒前至少 1 秒開始錄），用來比較兩種方式 |
 | 背景 | 避免有人在打者後方走動 |
 
 ### 1.3 揮棒內容
@@ -52,7 +52,7 @@ V0 目前所有功能**最多只到 `UNIT_VALIDATED`**（用合成資料驗證�
 用 `tools/field/manifest.example.csv` 當範本：
 
 ```
-file,condition,start,end,lighting,distance_m,note
+file,condition,start,end,lighting,distance_m,note,expected_swings
 ```
 
 欄位說明：
@@ -61,10 +61,11 @@ file,condition,start,end,lighting,distance_m,note
 |---|---|
 | file | 影片檔名（相對於 manifest 所在資料夾） |
 | condition | `normal`（正常）、`longStride`（步幅加長）、`shortStride`（步幅縮短）、`head`（頭部晃動）、`timing`（時機改變）、`other`（其他） |
-| start, end | 揮棒所在的秒數區間（選填；影片超過 10 秒時必填，記得包含揮棒前約 1 秒） |
+| start, end | 選填。填了就只分析這段秒數（當成一棒，記得包含揮棒前約 1 秒）；超過 10 秒且沒填，就當成一段練習影片，自動找出每一棒 |
 | lighting | 光線，例如 `night-field`、`day` |
 | distance_m | 鏡頭與打者距離（公尺） |
-| note | 備註 |
+| note | 備註（例如有空揮、走出打擊區） |
+| expected_swings | 這段影片實際揮了幾棒（用來檢查自動切棒）。步幅、頭部等刻意改變的揮棒請另外錄成獨立影片，因為 condition 會套用到同一支影片的每一棒 |
 
 每個拍攝場次另外記一次（寫在 note 或另一個文字檔）：
 
@@ -105,5 +106,6 @@ file,condition,start,end,lighting,distance_m,note
 | F7 | 校準一致性分數的尺度 | 正常揮棒之間絕對差異的分布 | 依資料設定 half-score 值（metric-definitions §6），重跑並記錄 |
 | F8 | iPhone 上的實際速度 | 計時紀錄 | 約 5 秒的影片能在練習可接受的時間內完成（目標 < 約 30 秒，記錄實際數值） |
 | F9 | 頭部指標用哪個版本 | 頭部晃動組中 head（相對骨盆）與 headAnchored（固定原點）的比較 | 決定哪一個當主要數值，並記錄理由 |
+| F10 | 一段影片中的每一棒都有被找到嗎？ | `summary.txt` 的 segmentation 行（找到幾棒 vs `expected_swings`），對照影片 | 每一次真正的揮棒都被找到；誤判（空揮、走動、撿球）列出並記錄；記錄 iPhone 上掃描整段影片的時間 |
 
 只有在 F1–F6 都通過後，`validation-status.md` 中的項目才可以改成 `FIELD_VALIDATED`。失敗就照實記錄，**不要為了讓 demo 好看去調整指標**。

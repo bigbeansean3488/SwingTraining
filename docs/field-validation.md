@@ -29,7 +29,7 @@ coaching AI, backend) until this evaluation has been run.**
 | Distance | Whole body incl. feet, hands at the top of the follow-through, and the stride fully inside the frame with margin. Start ~5–7 m; note the actual distance |
 | Orientation | Landscape preferred (more room for the stride); note it |
 | Format | 1080p at 60 fps if available (Settings → Camera → Record Video); also note if 4K/30 or slo-mo 120/240 was used |
-| Clip length | One swing per clip, **start recording ≥ 1 s before the swing** and stop ~1 s after the finish (clips ≤ 10 s are analyzed automatically) |
+| Clip length | **One recording per set of swings** (e.g. 10 swings, ≥ 4 s apart; the app finds every swing). Start ≥ 2 s before the first swing. Also record a few **single-swing clips** (≤ 10 s, start ≥ 1 s before the swing) to compare both paths |
 | Background | Avoid other people walking behind the batter |
 
 ### 1.3 Swings
@@ -58,8 +58,13 @@ end, so the baseline at each perturbed swing is made of normal swings.
 Use `tools/field/manifest.example.csv` as the template:
 
 ```
-file,condition,start,end,lighting,distance_m,note
+file,condition,start,end,lighting,distance_m,note,expected_swings
 ```
+
+For a recording, write how many swings were actually taken in
+`expected_swings` (and note any dry swings / walking out of the box), so
+segmentation can be checked. Put perturbed swings in their own recordings
+(the condition applies to every swing in a file).
 
 Plus once per session (in the note or a separate text file):
 
@@ -104,6 +109,7 @@ Plus once per session (in the note or a separate text file):
 | F7 | Calibrate the consistency score scale | distribution of absolute differences among normal swings | set half-score values (metric-definitions §6) from data, re-run, document |
 | F8 | Practical speed on iPhone | timing notes | analysis of a ~5 s clip completes in an acceptable time for practice (target < ~30 s; record actual) |
 | F9 | Head metric variant | head (pelvis-relative) vs headAnchored for head-perturbation swings | decide which one to keep as primary, document why |
+| F10 | Does segmentation find every swing in a recording? | `summary.txt` segmentation lines (found vs `expected_swings`), list of windows vs watching the video | every real swing found; false positives (dry swings, walking, picking up balls) listed and noted; record scan time on iPhone |
 
 Only after F1–F6 pass may any row in `validation-status.md` move to
 `FIELD_VALIDATED`. Record failures as they are; do not tune metrics to make the

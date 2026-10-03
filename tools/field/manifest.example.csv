@@ -1,8 +1,6 @@
-file,condition,start,end,lighting,distance_m,note
-swing01.MOV,normal,,,night-field,6,
-swing02.MOV,normal,,,night-field,6,
-swing03.MOV,normal,,,night-field,6,
-swing21.MOV,longStride,,,night-field,6,exaggerated long stride
-swing22.MOV,shortStride,,,night-field,6,minimal stride
-swing23.MOV,head,,,night-field,6,deliberate head movement toward pitcher
-swing24.MOV,timing,,,night-field,6,deliberately late start
+file,condition,start,end,lighting,distance_m,note,expected_swings
+session01.MOV,normal,,,night-field,6,one recording of 10 normal swings,10
+swing21.MOV,longStride,,,night-field,6,exaggerated long stride,
+swing22.MOV,shortStride,,,night-field,6,minimal stride,
+swing23.MOV,head,,,night-field,6,deliberate head movement toward pitcher,
+swing24.MOV,timing,,,night-field,6,deliberately late start,

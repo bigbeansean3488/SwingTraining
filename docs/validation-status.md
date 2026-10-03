@@ -32,6 +32,9 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Practice-first UI (Setup / Practice / Review / Settings) | YES | YES (headless Chrome 375/390/430 px, `tools/check-practice.mjs` 50 checks) | PENDING — not yet used by players at practice | docs/ux.md |
 | Head Stability display score (one-sided) | YES | YES | PENDING | metric-definitions §6.1 |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
+| Swing segmentation in a long recording (find every swing) | YES | YES | PENDING | `tests/segmentation.test.js`: 5-swing synthetic recordings with walking / leaving the frame / hand raise / waggle at 60, 30, 15 fps scans; windows analyzed at full rate recover events; left-handed + mirrored + smaller; nobody tracked → none. **Threshold provisional** (metric-definitions §8) |
+| Playback pose scan (`extractPoseByPlayback`) | YES | partial — used only to locate swings | PENDING | `tools/compare-extraction.mjs`: in headless Chrome (software GL) landmarks lagged seek-based ones by ~0.2–0.3 s, so metrics always use seek-per-frame windows |
+| Recording workflow UI (scan → per-swing analysis → list with replay + one-tap labels, stop keeps finished swings) | YES | YES (headless Chrome, synthetic recording in `tools/check-practice.mjs`) | PENDING — iPhone speed and real recordings untested | docs/ux.md |
 
 ## Test footage available so far
 
@@ -55,6 +58,24 @@ Content turned out to be an indoor **pitching** arcade (throwing motion), handhe
   same occlusion pattern in side-view batting.
 - Desktop Chrome GPU delegate: ~0.9 s per 4K frame including seek (seek-bound).
   iPhone speed not measured yet.
+
+## Recording workflow on IMG_4841.MOV (generic pitching clip, not swings)
+
+Automatic swing finding run through the real app in headless desktop Chrome
+(software GL, GPU delegate on SwiftShader), full model for the per-swing pass:
+
+- Scan: 733 frames (16 fps effective, playback rate fell to 0.12) in 432 s for
+  the 53 s clip. 9 candidates + 1 rejected (hands tracked in 10% of frames
+  around its peak). The clip contains throws and walking, not swings, so the
+  candidates are fast arm motions — this shows the mechanics work, not that
+  swings are found correctly (F10).
+- Per-candidate exact analysis: 78–106 s each (4K seek-bound); 4 analyzed
+  (QC good/fair), 4 rejected by QC, 1 rejected because motion started before
+  its window (window clipped by a neighbor 3 s earlier).
+- Total ≈ 22 min on this machine. **iPhone Safari speed is unknown** and is
+  the main practical risk of the recording workflow (F8/F10). If too slow on
+  the phone: 1080p instead of 4K, lite model for the per-swing pass, or a
+  lower per-swing sampling rate — record the trade-off before changing.
 
 ## M3 QC on real generic footage (IMG_4841.MOV)
 
