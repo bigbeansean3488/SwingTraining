@@ -25,6 +25,8 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Single-swing pipeline gating (QC → metrics) | YES | YES | PENDING | rejected swings return no metrics |
 | Multi-swing comparison (baseline of last 5 valid swings) | YES | YES | PENDING | `tests/comparison.test.js`: reference session flags swing 4 by stride and swing 5 by head; rejected swings excluded |
 | Motion consistency score | YES | YES | PENDING | `tests/consistency.test.js`: deterministic, reproducible from stored inputs, stable > moderate > high variability; **half-score scale provisional** |
+| Contact quality label (manual Good/Medium/Poor) | YES | YES | n/a (manual annotation) | `tests/session.test.js`; no inference |
+| Session/swing records + IndexedDB persistence | YES | YES (fake-indexeddb) | PENDING (iPhone Safari storage) | reopen = refresh test; reduced landmarks round-trip to same analysis |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far

@@ -29,3 +29,18 @@ video file (input / camera capture)
 - Phone on tripod, roughly side view (open side), single batter in frame.
 - Batting side is entered per session, not detected.
 - Frame rate is estimated from frame timestamps when the container doesn't expose it.
+
+## Stored data (IndexedDB `swingtraining`)
+
+- `sessions` { id, createdAt, playerName, battingSide, note }
+- `swings` (index `sessionId`) { id, sessionId, number, createdAt, video (metadata only),
+  poseQuality (QC summary), landmarks (reduced: 15 landmarks × x, y, visibility, 4 decimals),
+  analysis (events, metrics, trajectory), comparison, deviations, consistencyInputs,
+  consistency, contact ('good'|'medium'|'poor'|null), valid, excludeFromBaseline, note }
+- `meta` { key, value } — e.g. active session id
+
+Reduced landmarks are enough to re-run the whole analysis when formulas change
+(`expandSequence` → `analyzeSwing`; regression-tested). Videos are never stored.
+A typical swing record is well under 300 KB.
+
+Contact labels are manual outcome annotations only; nothing predicts them.

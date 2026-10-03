@@ -94,3 +94,49 @@ export function trackingCoverage(seq, threshold = VIS_THRESHOLD) {
   }
   return { frames: n, poseFraction: n ? withPose / n : 0, perLandmark, groups };
 }
+
+/** Landmarks kept when storing a swing (everything the V0 analysis reads). */
+export const STORED_LANDMARKS = [
+  LM.NOSE, LM.LEFT_EAR, LM.RIGHT_EAR,
+  LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER, LM.LEFT_ELBOW, LM.RIGHT_ELBOW, LM.LEFT_WRIST, LM.RIGHT_WRIST,
+  LM.LEFT_HIP, LM.RIGHT_HIP, LM.LEFT_KNEE, LM.RIGHT_KNEE, LM.LEFT_ANKLE, LM.RIGHT_ANKLE,
+];
+
+/**
+ * Compact storage form: only STORED_LANDMARKS, x/y/visibility rounded to 4
+ * decimals (≈0.2 px on a 1920 px frame), z dropped.
+ */
+export function reduceSequence(seq) {
+  const r4 = (v) => Math.round(v * 1e4) / 1e4;
+  return {
+    version: 1,
+    width: seq.width,
+    height: seq.height,
+    sampleFps: seq.sampleFps,
+    start: seq.start,
+    end: seq.end,
+    model: seq.model,
+    landmarks: STORED_LANDMARKS,
+    frames: seq.frames.map((f) => ({ t: f.t, p: f.lm ? STORED_LANDMARKS.flatMap((i) => [r4(f.lm[i][0]), r4(f.lm[i][1]), r4(f.lm[i][3])]) : null })),
+  };
+}
+
+/** Inverse of reduceSequence; landmarks not stored get visibility 0. */
+export function expandSequence(red) {
+  const ids = red.landmarks;
+  return {
+    version: 1,
+    width: red.width,
+    height: red.height,
+    sampleFps: red.sampleFps,
+    start: red.start,
+    end: red.end,
+    model: red.model,
+    frames: red.frames.map((f) => {
+      if (!f.p) return { t: f.t, lm: null };
+      const lm = Array.from({ length: NUM_LANDMARKS }, () => [0, 0, 0, 0]);
+      ids.forEach((i, j) => { lm[i] = [f.p[3 * j], f.p[3 * j + 1], 0, f.p[3 * j + 2]]; });
+      return { t: f.t, lm };
+    }),
+  };
+}

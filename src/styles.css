@@ -82,3 +82,9 @@ main {
 }
 .controls select { width: auto; }
 progress { width: 100%; margin-top: 8px; accent-color: var(--accent); }
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 8px 0; }
+.tbl th, .tbl td { text-align: right; padding: 4px 6px; border-bottom: 1px solid #2c343d; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl th { color: var(--muted); font-weight: 500; }
+.tbl tr.invalid td { color: var(--muted); text-decoration: line-through; }
