@@ -14,9 +14,35 @@ export function newId(prefix, now = Date.now(), rand = Math.random) {
   return `${prefix}-${now.toString(36)}-${Math.floor(rand() * 1e8).toString(36)}`;
 }
 
-export function createSession({ playerName = '', battingSide = null, note = '' } = {}, now = Date.now()) {
+export const FOCUS_KEYS = Object.freeze(['motion', 'head', 'stride', 'handPath']);
+
+export function createSession({ playerName = '', battingSide = null, note = '', focus = 'motion' } = {}, now = Date.now()) {
   if (battingSide !== null && battingSide !== 'R' && battingSide !== 'L') throw new Error('battingSide must be R, L or null');
-  return { id: newId('session', now), createdAt: now, playerName: playerName.trim(), battingSide, note };
+  if (!FOCUS_KEYS.includes(focus)) throw new Error(`invalid focus: ${focus}`);
+  return { id: newId('session', now), createdAt: now, playerName: playerName.trim(), battingSide, note, focus };
+}
+
+/** Training focus of a session (sessions created before focus existed → 'motion'). */
+export const sessionFocus = (session) => (FOCUS_KEYS.includes(session?.focus) ? session.focus : 'motion');
+
+/**
+ * Player shortcuts: most recently used first, unique by name, keeps the last
+ * batting side. `players` = [{ name, battingSide, lastUsed }].
+ */
+export function updatePlayers(players, { name, battingSide }, now = Date.now()) {
+  const n = (name || '').trim();
+  if (!n) return players;
+  const rest = players.filter((p) => p.name !== n);
+  return [{ name: n, battingSide: battingSide ?? null, lastUsed: now }, ...rest].slice(0, 12);
+}
+
+/** Player shortcuts derived from stored sessions (for data created before shortcuts existed). */
+export function playersFromSessions(sessions) {
+  let players = [];
+  for (const s of [...sessions].sort((a, b) => a.createdAt - b.createdAt)) {
+    players = updatePlayers(players, { name: s.playerName, battingSide: s.battingSide }, s.createdAt);
+  }
+  return players;
 }
 
 /** Compact QC summary stored with the swing. */

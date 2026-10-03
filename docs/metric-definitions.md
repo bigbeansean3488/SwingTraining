@@ -351,3 +351,34 @@ Synthetic results (`tests/consistency.test.js`):
 
 The ordering is regression-tested; the spread between sessions depends on the
 provisional h_i and must not be read as calibrated.
+
+### 6.1 Display scores per Training Focus (UI)
+
+The result screen shows one 0–100 number per Training Focus:
+
+| Focus | Display score | Source |
+|---|---|---|
+| Motion Consistency | composite score (§6) | `consistency.score` |
+| Stride Consistency | stride component score s_stride (§6) | two-sided |
+| Hand Path Consistency | wristPath component score s_wristPath (§6) | two-sided |
+| Head Stability | `100 / (1 + (max(0, head − baseline mean) / 0.10)²)` | `headStabilityScore` (one-sided) |
+
+Head Stability is one-sided on purpose: the head component of §6 penalizes
+*any* difference from the baseline, so a swing with clearly **less** head
+movement would score lower — misleading under the label "Stability". The
+display score penalizes only more movement than the baseline, using the same
+provisional half-score (0.10 T). It is a UI mapping; the stored metrics and
+the composite score are unchanged. FIELD_VALIDATED: PENDING.
+
+The trend shown next to the focus score ("比最近 5 棒平均 +6") compares it with
+the mean display score of up to 5 earlier valid swings that have one.
+
+## 7. Result wording (`src/app/interpret.js`)
+
+Traditional Chinese with English baseball terms. Scalar components use the §5
+z value: |z| < 1 → 相近, 1 ≤ |z| < 2 → 稍長/稍短/稍多/稍少, |z| ≥ 2 → 明顯…;
+head uses a rank statement ("比最近 N 棒都多/少") when it holds for all ≥ 3
+baseline swings and |z| ≥ 1. Hand path: deviation < 1.5 相近, < 3 有些不同,
+else 明顯不同. Motion names the component with the largest deviation when it is
+≥ 2, otherwise 整體動作與最近 N 棒相近. These cut-offs are display conventions,
+not validated thresholds. No coaching diagnosis is generated.

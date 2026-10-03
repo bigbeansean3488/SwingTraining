@@ -78,3 +78,15 @@ export function sessionConsistency(scores) {
   const mean = v.reduce((a, b) => a + b, 0) / v.length;
   return { mean, min: Math.min(...v), max: Math.max(...v), count: v.length };
 }
+
+/**
+ * Head Stability display score (0–100) for the UI's "Head Stability" focus.
+ * One-sided: only MORE head movement than the baseline mean lowers it (less
+ * movement is not penalized), using the same half-score as the head
+ * component. Null without a baseline. Documented in metric-definitions §6.1.
+ */
+export function headStabilityScore(cmp, params = CONSISTENCY_PARAMS) {
+  const h = cmp?.ok ? cmp.components.head : null;
+  if (!h) return null;
+  return componentScore(Math.max(0, h.current - h.mean), params.halfScore.head);
+}
