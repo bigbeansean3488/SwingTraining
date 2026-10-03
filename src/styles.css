@@ -74,3 +74,11 @@ main {
 .meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 12px 0 0; font-size: 0.9rem; }
 .meta dt { color: var(--muted); }
 .meta dd { margin: 0; overflow-wrap: anywhere; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0; font-size: 0.9rem; }
+.controls input, .controls select {
+  width: 5.5em; min-height: 36px; padding: 0 8px; margin-left: 4px;
+  background: #0f1317; color: var(--text); border: 1px solid #2c343d; border-radius: 8px; font: inherit;
+}
+.controls select { width: auto; }
+progress { width: 100%; margin-top: 8px; accent-color: var(--accent); }

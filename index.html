@@ -28,8 +28,25 @@
     <section class="card" id="video-card" hidden>
       <div class="stage">
         <video id="video" playsinline muted controls preload="auto"></video>
+        <canvas id="overlay"></canvas>
       </div>
       <dl class="meta" id="video-meta"></dl>
+
+      <div class="controls">
+        <label>From <input id="range-start" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
+        <label>To <input id="range-end" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
+        <label>Model
+          <select id="model-variant">
+            <option value="lite">lite (fast)</option>
+            <option value="full" selected>full</option>
+            <option value="heavy">heavy (slow)</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn primary file-btn" id="analyze-btn">Analyze pose</button>
+      <progress id="analyze-progress" max="1" value="0" hidden></progress>
+      <p class="muted small" id="analyze-status"></p>
+      <dl class="meta" id="tracking-summary"></dl>
     </section>
 
     <section class="card">
