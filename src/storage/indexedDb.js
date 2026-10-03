@@ -19,9 +19,10 @@ function txDone(tx) {
   });
 }
 
-export async function openStore(idb = globalThis.indexedDB, name = DB_NAME) {
+export async function openStore(idb = globalThis.indexedDB, name = DB_NAME, { timeoutMs = 5000 } = {}) {
   if (!idb) throw new Error('IndexedDB is not available in this browser');
   const open = idb.open(name, DB_VERSION);
+  open.onblocked = () => console.warn('IndexedDB open blocked by another open connection');
   open.onupgradeneeded = () => {
     const db = open.result;
     if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'id' });
@@ -31,7 +32,15 @@ export async function openStore(idb = globalThis.indexedDB, name = DB_NAME) {
     }
     if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
   };
-  const db = await req(open);
+  // Never let a stuck open (e.g. a previous page still holding a connection)
+  // hang the app: fail visibly after a timeout instead.
+  let timer;
+  const db = await Promise.race([
+    req(open),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('timed out opening local storage')), timeoutMs); }),
+  ]).finally(() => clearTimeout(timer));
+  db.onversionchange = () => db.close();
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', () => db.close(), { once: true });
 
   const put = async (store, value) => {
     const tx = db.transaction(store, 'readwrite');

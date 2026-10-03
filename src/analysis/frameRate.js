@@ -40,13 +40,13 @@ const VIDEO_EXT = ['mov', 'mp4', 'm4v', 'webm', '3gp'];
  * @param {{name:string, type:string, size:number}} file
  */
 export function checkVideoFile(file) {
-  if (!file) return { ok: false, reason: 'No file selected.' };
-  if (file.size === 0) return { ok: false, reason: 'File is empty.' };
+  if (!file) return { ok: false, reason: '沒有選擇檔案。' };
+  if (file.size === 0) return { ok: false, reason: '檔案是空的。' };
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   const typeOk = typeof file.type === 'string' && file.type.startsWith('video/');
   // iOS sometimes reports an empty MIME type; fall back to the extension.
   if (!typeOk && !VIDEO_EXT.includes(ext)) {
-    return { ok: false, reason: `Not a video file (${file.type || ext || 'unknown type'}).` };
+    return { ok: false, reason: `這不是影片檔（${file.type || ext || '未知格式'}）。` };
   }
   return { ok: true, reason: '' };
 }

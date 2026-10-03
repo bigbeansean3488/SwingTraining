@@ -2,10 +2,10 @@
 import { estimateFrameRate, checkVideoFile } from '../analysis/frameRate.js';
 
 const MEDIA_ERRORS = {
-  1: 'Loading was aborted.',
-  2: 'Network error while reading the file.',
-  3: 'The video could not be decoded (corrupt file or unsupported codec).',
-  4: 'This video format is not supported by this browser.',
+  1: '讀取被中斷。',
+  2: '讀取檔案時發生錯誤。',
+  3: '無法解碼這支影片（檔案損毀或不支援的編碼）。',
+  4: '這個瀏覽器不支援這種影片格式。',
 };
 
 let currentUrl = null;
@@ -36,8 +36,8 @@ export function loadVideoFile(video, file, { timeoutMs = 15000 } = {}) {
     };
     const onLoaded = () => {
       cleanup();
-      if (!video.videoWidth || !video.videoHeight) return fail('The file has no decodable video track.');
-      if (!Number.isFinite(video.duration) || video.duration <= 0) return fail('Video duration could not be determined.');
+      if (!video.videoWidth || !video.videoHeight) return fail('檔案裡沒有可播放的影像。');
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return fail('無法取得影片長度。');
       resolve({
         name: file.name,
         sizeBytes: file.size,
@@ -47,8 +47,8 @@ export function loadVideoFile(video, file, { timeoutMs = 15000 } = {}) {
         height: video.videoHeight,
       });
     };
-    const onError = () => fail(MEDIA_ERRORS[video.error?.code] || 'The video could not be loaded.');
-    timer = setTimeout(() => fail('Timed out while loading the video.'), timeoutMs);
+    const onError = () => fail(MEDIA_ERRORS[video.error?.code] || '無法載入影片。');
+    timer = setTimeout(() => fail('載入影片逾時。'), timeoutMs);
     video.addEventListener('loadeddata', onLoaded);
     video.addEventListener('error', onError);
     video.muted = true;
