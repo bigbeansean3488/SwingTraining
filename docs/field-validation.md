@@ -1,5 +1,7 @@
 # Field Validation Package
 
+中文版：[field-validation.zh-TW.md](field-validation.zh-TW.md)
+
 Everything in V0 is `UNIT_VALIDATED` on synthetic data at most. This document
 says exactly what real footage to collect and how to evaluate it, so field
 validation can start the day footage exists.
