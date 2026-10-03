@@ -382,3 +382,55 @@ baseline swings and |z| ≥ 1. Hand path: deviation < 1.5 相近, < 3 有些不�
 else 明顯不同. Motion names the component with the largest deviation when it is
 ≥ 2, otherwise 整體動作與最近 N 棒相近. These cut-offs are display conventions,
 not validated thresholds. No coaching diagnosis is generated.
+
+---
+
+## 8. Swing segmentation in a long recording (`src/analysis/segmentation.js`)
+
+Practice workflow: start recording, hit N balls, stop, analyze. Recordings
+longer than 10 s are processed in two passes:
+
+1. **Scan** (`extractPoseByPlayback`, lite model): the video plays muted and
+   pose is detected on frames delivered by `requestVideoFrameCallback`, at most
+   15 per second of media time; the playback rate adapts so detection keeps
+   up. These landmarks are used **only to locate swings**, never for metrics
+   (observed in headless Chrome: playback landmarks lag the seek-based ones by
+   ~0.2–0.3 s, see validation-plan.md).
+2. **Per-swing analysis**: each candidate window is extracted again with the
+   exact seek-per-frame method at the video frame rate (≤ 60 fps) and the
+   selected model, then analyzed by `analyzeSwing()` exactly like a short clip
+   (QC → events → metrics → comparison). Swings join the session in recording
+   order.
+
+Segmentation signal (scan sequence, no smoothing):
+
+```
+h_k   = hands_k − pelvis_k                     (image px, per frame)
+T_k   = rolling median over ±1 s of |shoulderMid − pelvis|
+v_k   = |h_{k+1} − h_{k−1}| / (t_{k+1} − t_{k−1}) / T_k     (T/s)
+```
+
+Pelvis-relative so that walking or stepping out between swings does not look
+like a swing; locally scaled so moving toward/away from the camera does not
+change the threshold.
+
+| Step | Rule (defaults in `SEGMENT_DEFAULTS`) |
+|---|---|
+| Candidate runs | frames with `v ≥ 5 T/s`; runs separated by < 0.3 s are one run; peak = max of the run |
+| Merge | peaks < 2.5 s apart are one swing (the larger peak is kept) — follow-through / bat recoil |
+| Window | `[peak − 2.5 s, peak + 1.5 s]`, clipped to the recording and to halfway between neighboring peaks (a window never contains another swing's fastest part) |
+| Tracking | hands tracked in < 50% of frames in `[peak − 1 s, peak + 0.5 s]` → candidate rejected |
+
+Synthetic peaks: ~11 T/s at 60 fps, ~8.5 T/s at a 15 fps scan, ~9.5 T/s for a
+faster 0.17 s swing at 15 fps; distractors (walking out and back, raising the
+hands to the helmet, bat waggle) stay below 3.4 T/s. The 5 T/s threshold is
+**provisional** — real swing and non-swing hand speeds are unknown until field
+footage (F10).
+
+Known limits (by design, not handled):
+- Dry/practice swings, check swings and throws are fast hand motions and are
+  reported as swings; the player deletes them in the list.
+- Two swings < 2.5 s apart are reported as one.
+- A bat waggle immediately before the swing can be merged into the motion by
+  event detection (§3: activity above θ with pauses < 0.15 s), moving
+  `motionStart` earlier; this is existing single-swing behavior.

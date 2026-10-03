@@ -55,7 +55,7 @@ export function smoothstep(t, a, b) {
   return u * u * (3 - 2 * u);
 }
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -66,7 +66,7 @@ function mulberry32(seed) {
   };
 }
 
-function gaussian(rng) {
+export function gaussian(rng) {
   const u = Math.max(rng(), 1e-12);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
 }
@@ -145,7 +145,7 @@ export function bodyAt(t, p) {
   return P;
 }
 
-function visibilityFor(i, p) {
+export function visibilityFor(i, p) {
   const far = p.battingSide === 'R' ? 'RIGHT' : 'LEFT'; // open-side view: rear side is far from camera
   if (i === LM[`${far}_WRIST`]) return p.visFarWrist;
   const name = Object.keys(LM).find((k) => LM[k] === i);
