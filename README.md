@@ -53,6 +53,12 @@ tools/                browser checks, plots, field-validation runner
 docs/                 architecture, metric definitions, validation status/plan, field validation
 ```
 
+## Using it
+
+訓練 → 選球員、右打/左打、今天想看什麼 → 開始訓練 → ＋ 下一棒（錄影或選片，短片自動分析）→
+看結果、標記擊球感覺 → ＋ 下一棒。紀錄 tab 看整個 Session。Developer Tools（合成揮棒、Pose model、
+診斷）在 設定 裡，或網址加 `?debug=1`。See [docs/ux.md](docs/ux.md).
+
 ## Status
 
 V0 pipeline complete through Milestone 9 and unit-validated on synthetic data.

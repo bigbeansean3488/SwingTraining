@@ -1,157 +1,205 @@
-// Entry point: wires the practice loop.
-//   Start session → record/choose swing → pose → analyze (QC, metrics,
-//   comparison, consistency) → result → contact label → next swing
+// Entry point / controller for the practice-first UI.
+//   訓練: Setup (no session) → Practice loop (＋ 下一棒 → auto analysis → result → Contact → ＋ 下一棒)
+//   紀錄: Review of the current session
+//   設定: session/player/data management + Developer Tools (debug)
 // Analysis logic lives in src/analysis and must not import from src/ui.
 import { loadVideoFile, probeFrameRate } from './ui/video.js';
 import { extractPoseSequence } from './pose/mediapipe.js';
-import { expandSequence, LM } from './pose/landmarks.js';
 import { drawSkeleton, syncCanvas, nearestFrameIndex } from './ui/skeleton.js';
 import { analyzeSwing } from './analysis/pipeline.js';
-import { createSession, createSwingRecord, setContactLabel, recomputeSession, exportSession } from './app/session.js';
+import {
+  createSession, createSwingRecord, setContactLabel, recomputeSession, exportSession,
+  updatePlayers, playersFromSessions, sessionFocus, FOCUS_KEYS,
+} from './app/session.js';
+import { FOCUS, SIDE_ZH } from './app/interpret.js';
 import { openStore } from './storage/indexedDb.js';
-import { renderResult } from './ui/results.js';
-import { renderHistory, renderSessionList, sessionTitle } from './ui/session.js';
-import { renderLabelView } from './ui/labels.js';
+import { $, delegate } from './ui/dom.js';
+import { openDialog } from './ui/dialog.js';
+import { renderSetup, GUEST } from './ui/views/setup.js';
+import { renderStatus, renderResult, renderRecent } from './ui/views/practice.js';
+import { renderReview } from './ui/views/review.js';
+import { renderDetail } from './ui/views/detail.js';
+import { renderSettings } from './ui/views/settings.js';
 import { generateSwing, dropFrames } from './synthetic/swing.js';
 import { naturalVariation } from './synthetic/session.js';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.10.0';
 const AUTO_ANALYZE_MAX_S = 10;
-const DEFAULT_WINDOW_S = 8;
+const PRE_ROLL_S = 3; // "分析這個位置": window = [t − 3 s, t + 2 s]
+const POST_ROLL_S = 2;
 
-const $ = (id) => document.getElementById(id);
+const ls = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
+
 const state = {
   store: null,
   session: null,
   swings: [],
-  currentId: null,
+  sessions: [],
+  players: [],
+  tab: 'train',
+  setup: { name: '', side: 'R', focus: 'motion' },
+  status: null, // { stage: 'load'|'choose'|'track'|'compute', progress } | { error }
+  videoPanel: false,
+  detailId: null,
+  debug: new URLSearchParams(location.search).get('debug') === '1' || ls.get('swingtraining.debug') === '1',
+  poseModel: ls.get('swingtraining.model') || 'full',
   video: { meta: null, fpsInfo: null, pose: null, recordId: null },
   busy: false,
+  lastDiag: null,
 };
 window.__app = state; // for automated browser checks
 
 // ---------------------------------------------------------------- helpers
 
-function showError(id, msg) {
-  const el = $(id);
-  el.textContent = msg || '';
-  el.hidden = !msg;
-}
-
-function checkEnvironment() {
+function envSummary() {
   const checks = {
     IndexedDB: 'indexedDB' in window,
     WebAssembly: typeof WebAssembly === 'object',
     WebGL2: !!document.createElement('canvas').getContext('webgl2'),
     FrameCallback: 'requestVideoFrameCallback' in HTMLVideoElement.prototype,
   };
-  return Object.entries(checks).map(([n, ok]) => `${ok ? '✓' : '✗'} ${n}`).join('  ');
+  return `${Object.entries(checks).map(([n, ok]) => `${ok ? '✓' : '✗'} ${n}`).join('  ')}  · ${navigator.userAgent}`;
 }
 
-function renderDl(el, rows) {
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  el.innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+function diagSummary() {
+  return JSON.stringify({
+    version: APP_VERSION,
+    poseModel: state.poseModel,
+    storage: !!state.store,
+    session: state.session?.id ?? null,
+    swings: state.swings.length,
+    lastVideo: state.video.meta ? { name: state.video.meta.name, duration: state.video.meta.duration, size: `${state.video.meta.width}x${state.video.meta.height}`, fps: state.video.fpsInfo } : null,
+    lastAnalysis: state.lastDiag,
+  }, null, 2);
 }
 
 async function persist(...swings) {
-  if (!state.store) return;
+  if (!state.store || !swings.length) return;
   try { await state.store.putSwings(swings); } catch (e) { console.warn('save failed', e); }
 }
 
-const currentSwing = () => state.swings.find((s) => s.id === state.currentId) || null;
+const focus = () => sessionFocus(state.session);
+const newest = () => state.swings.at(-1) || null;
+
+function showError(msg) {
+  const el = $('app-error');
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
 
 // ---------------------------------------------------------------- rendering
 
-function renderAll() {
+function render() {
   const active = !!state.session;
-  $('start-card').hidden = active;
-  $('session-card').hidden = !active;
-  $('capture-card').hidden = !active;
-  $('history-card').hidden = !active || !state.swings.length;
-  if (!active) {
-    $('result-card').hidden = true;
-    $('replay-card').hidden = true;
-    return;
-  }
-  const valid = state.swings.filter((s) => s.valid).length;
-  $('session-title').textContent = sessionTitle(state.session);
-  $('session-stats').textContent = `${state.swings.length} swings · ${valid} valid · ${state.swings.length - valid} rejected`;
-  renderHistory($('history'), state.swings, state.currentId, (id) => { state.currentId = id; renderAll(); });
-  renderLabelView($('label-view'), state.swings);
-  const sw = currentSwing();
-  renderResult($('result-card'), sw, {
-    onLabel: (label) => updateSwing(sw.id, (s) => setContactLabel(s, label), false),
-    onExclude: (ex) => updateSwing(sw.id, (s) => ({ ...s, excludeFromBaseline: ex }), true),
-    onDelete: () => deleteSwing(sw.id),
+  const t = state.tab;
+  $('view-setup').hidden = !(t === 'train' && !active);
+  $('view-practice').hidden = !(t === 'train' && active);
+  $('view-review').hidden = t !== 'review';
+  $('view-settings').hidden = t !== 'settings';
+  document.querySelectorAll('.tab').forEach((b) => {
+    if (b.dataset.tab === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  renderReplay(sw);
+  const chip = $('session-menu-btn');
+  chip.hidden = !active;
+  if (active) {
+    const s = state.session;
+    $('session-chip-text').textContent = `${s.playerName || GUEST} · ${s.battingSide ? SIDE_ZH[s.battingSide] : '—'} · ${state.swings.length} 棒`;
+  }
+  // While choosing the swing in a long clip, 分析這個位置 is the one primary action.
+  $('action-bar').hidden = !(t === 'train' && active) || !!state.detailId || state.status?.stage === 'choose';
+  document.body.classList.toggle('has-action-bar', !$('action-bar').hidden);
+  renderNextButton();
+
+  if (!$('view-setup').hidden) {
+    renderSetup($('view-setup'), { players: state.players, ...state.setup, sessions: state.sessions });
+  }
+  if (!$('view-practice').hidden) renderPractice();
+  if (t === 'review') renderReview($('view-review'), { session: state.session, swings: state.swings, focus: focus(), sessions: state.sessions });
+  if (t === 'settings') {
+    renderSettings($('view-settings'), {
+      session: state.session, swings: state.swings, players: state.players, sessions: state.sessions,
+      debug: state.debug, poseModel: state.poseModel, env: state.debug ? envSummary() : '', diag: state.debug ? diagSummary() : '', version: APP_VERSION,
+    });
+  }
+  renderSheet();
 }
 
-/** Static replay: skeleton at peak hand speed + current and recent hand paths. */
-function renderReplay(sw) {
-  const replayCard = $('replay-card');
-  // The swing whose video is loaded already shows its skeleton on the video.
-  if (!sw?.landmarks || (sw.id === state.video.recordId && !$('video-block').hidden)) { replayCard.hidden = true; return; }
-  replayCard.hidden = false;
-  const seq = expandSequence(sw.landmarks);
-  const canvas = $('replay');
-  const card = canvas.parentElement;
-  const pad = parseFloat(getComputedStyle(card).paddingLeft) + parseFloat(getComputedStyle(card).paddingRight);
-  const maxW = Math.min((card.clientWidth - pad) || 320, 480);
-  const aspect = seq.height / seq.width;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.style.width = `${maxW}px`;
-  canvas.style.height = `${maxW * aspect}px`;
-  canvas.width = Math.round(maxW * dpr);
-  canvas.height = Math.round(maxW * aspect * dpr);
-  const ev = sw.analysis.events;
-  const tShow = ev?.peakHandSpeed ?? seq.frames[Math.floor(seq.frames.length / 2)]?.t;
-  const k = nearestFrameIndex(seq.frames, tShow);
-  const trails = [];
-  if (ev?.motionStart !== undefined) {
-    const handPt = (lm) => {
-      const l = lm[LM.LEFT_WRIST]; const r = lm[LM.RIGHT_WRIST];
-      const wl = l[3]; const wr = r[3];
-      if (wl < 0.5 && wr < 0.5) return null;
-      return [(l[0] * wl + r[0] * wr) / (wl + wr), (l[1] * wl + r[1] * wr) / (wl + wr)];
-    };
-    const n = sw.analysis.normalization;
-    if (n) {
-      // Recent valid swings' anchored hand trajectories mapped into this image.
-      const prev = state.swings.filter((s) => s.valid && s.number < sw.number && s.analysis.trajectory).slice(-3);
-      for (const p of prev) {
-        trails.push({
-          color: '#c678dd', alpha: 0.6, width: 0.6,
-          points: p.analysis.trajectory.hands.map((q) => (q ? [(n.origin[0] + n.direction * q[0] * n.T) / seq.width, (n.origin[1] + q[1] * n.T) / seq.height] : null)),
-        });
-      }
-    }
-    trails.push({ color: '#4fb3ff', width: 1, points: seq.frames.filter((f) => f.t >= ev.motionStart && f.t <= ev.swingEnd && f.lm).map((f) => handPt(f.lm)) });
+function renderPractice() {
+  renderStatus($('practice-status'), state.status);
+  $('video-panel').hidden = !state.videoPanel;
+  $('range-block').hidden = state.status?.stage !== 'choose';
+  const n = newest();
+  const busy = state.busy || state.status?.stage === 'choose';
+  // While a new swing is being analyzed, don't show the previous result as if it were current.
+  const res = $('practice-result');
+  if (busy) res.innerHTML = '';
+  else renderResult(res, n, focus(), state.swings.slice(0, -1), { showVideoButton: !!n && n.id === state.video.recordId });
+  renderRecent($('practice-recent'), state.swings, focus());
+}
+
+function renderNextButton() {
+  const btn = $('next-btn');
+  const busy = state.busy;
+  btn.classList.toggle('is-busy', busy);
+  btn.setAttribute('aria-disabled', String(busy));
+  $('video-input').disabled = busy;
+  $('next-btn-text').textContent = busy ? '分析中…' : '＋ 下一棒';
+}
+
+function renderSheet() {
+  const sheet = $('sheet');
+  const sw = state.swings.find((s) => s.id === state.detailId);
+  if (!sw) {
+    state.detailId = null;
+    sheet.hidden = true;
+    sheet.innerHTML = '';
+    document.body.classList.remove('sheet-open');
+    return;
   }
-  const ctx = canvas.getContext('2d');
-  drawSkeleton(canvas, seq.frames[k]?.lm ?? null, { trails });
-  ctx.globalCompositeOperation = 'destination-over';
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.globalCompositeOperation = 'source-over';
+  const i = state.swings.indexOf(sw);
+  // Show first so the replay canvas can measure its container.
+  sheet.hidden = false;
+  document.body.classList.add('sheet-open');
+  renderDetail(sheet, sw, { focus: focus(), previous: state.swings.slice(0, i), allSwings: state.swings, debug: state.debug });
 }
 
 // ---------------------------------------------------------------- session ops
 
+async function loadSessionsAndPlayers() {
+  if (!state.store) return;
+  state.sessions = await state.store.listSessions();
+  const stored = await state.store.getMeta('players');
+  state.players = stored ?? playersFromSessions(state.sessions);
+}
+
+function defaultSetup() {
+  const p = state.players[0];
+  const lastFocus = ls.get('swingtraining.focus');
+  state.setup = { name: p?.name ?? '', side: p?.battingSide ?? 'R', focus: FOCUS_KEYS.includes(lastFocus) ? lastFocus : 'motion' };
+}
+
 async function startSession() {
-  const session = createSession({
-    playerName: $('player-name').value,
-    battingSide: $('batting-side').value || null,
-    note: $('session-note').value,
-  });
+  const typed = $('player-name')?.value.trim() ?? '';
+  const name = typed || (state.setup.name === GUEST ? '' : state.setup.name);
+  const session = createSession({ playerName: name, battingSide: state.setup.side, focus: state.setup.focus });
+  ls.set('swingtraining.focus', state.setup.focus);
   state.session = session;
   state.swings = [];
-  state.currentId = null;
+  state.status = null;
+  state.videoPanel = false;
+  if (name) state.players = updatePlayers(state.players, { name, battingSide: state.setup.side });
   if (state.store) {
     await state.store.putSession(session);
     await state.store.setMeta('activeSession', session.id);
+    await state.store.setMeta('players', state.players);
+    state.sessions = await state.store.listSessions();
   }
-  renderAll();
+  state.tab = 'train';
+  render();
+  window.scrollTo(0, 0);
 }
 
 async function resumeSession(id) {
@@ -160,20 +208,63 @@ async function resumeSession(id) {
   if (!session) return;
   state.session = session;
   state.swings = await state.store.listSwings(id);
-  state.currentId = state.swings.at(-1)?.id ?? null;
+  state.status = null;
+  state.videoPanel = false;
   await state.store.setMeta('activeSession', id);
-  renderAll();
+  state.tab = 'train';
+  render();
 }
 
 async function endSession() {
+  const r = await openDialog({
+    title: '結束目前 Session？',
+    body: '目前資料已儲存在此裝置，之後可以在「紀錄」或「設定」中再打開。',
+    actions: [{ label: '取消', value: null }, { label: '結束並建立新 Session', kind: 'primary', value: 'end' }],
+  });
+  if (!r) return;
   state.session = null;
   state.swings = [];
-  state.currentId = null;
+  state.detailId = null;
+  state.status = null;
+  state.videoPanel = false;
   if (state.store) {
     await state.store.setMeta('activeSession', null);
-    renderSessionList($('session-list'), await state.store.listSessions(), resumeSession);
+    state.sessions = await state.store.listSessions();
   }
-  renderAll();
+  defaultSetup();
+  state.tab = 'train';
+  render();
+}
+
+async function saveSession() {
+  if (state.store) await state.store.putSession(state.session);
+}
+
+async function renameSession() {
+  const r = await openDialog({
+    title: '重新命名',
+    input: { label: '球員名稱', value: state.session.playerName, placeholder: '例如：Sean' },
+    actions: [{ label: '取消', value: null }, { label: '儲存', kind: 'primary', value: 'ok' }],
+  });
+  if (!r) return;
+  state.session = { ...state.session, playerName: (r.text || '').trim() };
+  if (state.session.playerName) state.players = updatePlayers(state.players, { name: state.session.playerName, battingSide: state.session.battingSide });
+  await saveSession();
+  if (state.store) await state.store.setMeta('players', state.players);
+  render();
+}
+
+async function changeFocus() {
+  const r = await openDialog({
+    title: '變更 Training Focus',
+    body: '只會改變結果畫面上最大的那個指標，不影響已分析的資料。',
+    actions: [...FOCUS_KEYS.map((k) => ({ label: FOCUS[k].label, kind: k === focus() ? 'primary' : 'plain', value: k })), { label: '取消', value: null }],
+  });
+  if (!r) return;
+  state.session = { ...state.session, focus: r.value };
+  ls.set('swingtraining.focus', r.value);
+  await saveSession();
+  render();
 }
 
 function exportCurrent() {
@@ -188,33 +279,55 @@ function exportCurrent() {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+async function sessionMenu() {
+  const r = await openDialog({
+    title: `${state.session.playerName || GUEST} 的 Session`,
+    actions: [
+      { label: '查看 Session 紀錄', value: 'review' },
+      { label: '匯出資料', value: 'export' },
+      { label: '重新命名', value: 'rename' },
+      { label: '變更 Training Focus', value: 'focus' },
+      { label: '結束 Session', value: 'end' },
+      { label: '關閉', value: null },
+    ],
+  });
+  if (!r) return;
+  if (r.value === 'review') { state.tab = 'review'; render(); }
+  if (r.value === 'export') exportCurrent();
+  if (r.value === 'rename') renameSession();
+  if (r.value === 'focus') changeFocus();
+  if (r.value === 'end') endSession();
+}
+
 async function addSwing({ seq, analysis, video }) {
   const record = createSwingRecord({ session: state.session, seq, analysis, video, previous: state.swings });
   state.swings.push(record);
-  state.currentId = record.id;
   await persist(record);
-  renderAll();
-  $('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   return record;
 }
 
-/** Update one swing; if it affects baselines, recompute later comparisons. */
 async function updateSwing(id, fn, affectsBaseline) {
   state.swings = state.swings.map((s) => (s.id === id ? fn(s) : s));
   if (affectsBaseline) state.swings = recomputeSession(state.swings);
   await persist(...state.swings.filter((s) => affectsBaseline || s.id === id));
-  renderAll();
+  render();
 }
 
 async function deleteSwing(id) {
-  if (!confirm('Delete this swing?')) return;
+  const sw = state.swings.find((s) => s.id === id);
+  const r = await openDialog({
+    title: `刪除 Swing #${sw?.number}？`,
+    body: '刪除後無法復原，之後的比較會重新計算。',
+    actions: [{ label: '取消', value: null }, { label: '刪除', kind: 'danger', value: 'delete' }],
+  });
+  if (!r) return;
   state.swings = recomputeSession(state.swings.filter((s) => s.id !== id));
   if (state.store) {
     await state.store.deleteSwing(id);
     await persist(...state.swings);
   }
-  state.currentId = state.swings.at(-1)?.id ?? null;
-  renderAll();
+  state.detailId = null;
+  render();
 }
 
 // ---------------------------------------------------------------- video flow
@@ -237,93 +350,97 @@ function startOverlayLoop() {
     video.requestVideoFrameCallback(tick);
   }
   video.addEventListener('seeked', drawVideoOverlay);
-  window.addEventListener('resize', () => { drawVideoOverlay(); renderReplay(currentSwing()); });
+  window.addEventListener('resize', () => { drawVideoOverlay(); if (state.detailId) renderSheet(); });
+}
+
+function setStatus(st) {
+  state.status = st;
+  render();
 }
 
 async function onFileSelected(file) {
-  if (state.busy) return;
-  showError('video-error', '');
-  $('video-block').hidden = true;
-  $('analyze-status').textContent = '';
+  if (state.busy || !state.session) return;
+  state.busy = true;
+  state.tab = 'train';
   state.video = { meta: null, fpsInfo: null, pose: null, recordId: null };
+  state.videoPanel = true;
+  render();
+  setStatus({ stage: 'load' });
+  window.scrollTo(0, 0);
   const video = $('video');
   try {
     state.video.meta = await loadVideoFile(video, file);
   } catch (err) {
-    showError('video-error', `Could not load video: ${err.message}`);
+    state.busy = false;
+    state.videoPanel = false;
+    setStatus({ error: `無法讀取這支影片：${err.message}` });
     window.__swingDebug = { error: err.message };
     return;
   }
-  $('video-block').hidden = false;
   const meta = state.video.meta;
-  const renderMeta = () => renderDl($('video-meta'), [
-    ['Video', `${meta.duration.toFixed(1)} s · ${meta.width}×${meta.height}`],
-    ['Frame rate', state.video.fpsInfo?.reliable ? `${state.video.fpsInfo.fps.toFixed(1)} fps (measured)` : `unknown${state.video.fpsInfo ? ` — ${state.video.fpsInfo.reason}` : ''}`],
-  ]);
-  renderMeta();
   state.video.fpsInfo = await probeFrameRate(video);
-  renderMeta();
-  window.__swingDebug = { meta, fpsInfo: state.video.fpsInfo };
+  const fps = state.video.fpsInfo;
+  $('video-meta').textContent = `${meta.duration.toFixed(1)} 秒 · ${meta.width}×${meta.height}${fps?.reliable ? ` · ${fps.fps.toFixed(0)} FPS` : ''}`;
+  window.__swingDebug = { meta, fpsInfo: fps };
   drawVideoOverlay();
-  const long = meta.duration > AUTO_ANALYZE_MAX_S;
-  $('range-block').hidden = !long;
-  $('range-start').value = '0';
-  $('range-end').value = Math.min(meta.duration, DEFAULT_WINDOW_S).toFixed(1);
-  if (!long) await analyzeVideo(0, meta.duration);
+  if (meta.duration > AUTO_ANALYZE_MAX_S) {
+    state.busy = false;
+    $('range-start').value = '0';
+    $('range-end').value = Math.min(meta.duration, 8).toFixed(1);
+    setStatus({ stage: 'choose' });
+    return;
+  }
+  await analyzeVideo(0, meta.duration);
 }
 
 async function analyzeVideo(start, end) {
-  if (state.busy) return;
   const video = $('video');
   const meta = state.video.meta;
-  if (!(end > start)) { $('analyze-status').textContent = 'Invalid range: "To" must be after "From".'; return; }
+  if (!meta || !(end > start)) return;
   const fpsInfo = state.video.fpsInfo;
   const sampleFps = window.__forceSampleFps || (fpsInfo?.reliable ? Math.min(60, Math.round(fpsInfo.fps)) : 30);
   state.busy = true;
-  $('analyze-btn').disabled = true;
-  const prog = $('analyze-progress');
-  prog.hidden = false;
-  prog.value = 0;
-  $('analyze-status').textContent = 'Loading pose model…';
+  setStatus({ stage: 'track', progress: 0 });
   video.pause();
   try {
     const seq = await extractPoseSequence(video, {
-      variant: $('model-variant').value, start, end, sampleFps,
+      variant: state.poseModel, start, end, sampleFps,
       onProgress: (p, frame) => {
-        prog.value = p;
-        $('analyze-status').textContent = `Tracking pose… ${Math.round(p * 100)}%`;
+        state.status = { stage: 'track', progress: p };
+        renderStatus($('practice-status'), state.status);
         syncCanvas($('overlay'), video);
         drawSkeleton($('overlay'), frame.lm);
       },
     });
     state.video.pose = seq;
-    $('analyze-status').textContent = 'Analyzing swing…';
+    setStatus({ stage: 'compute' });
+    await new Promise((r) => setTimeout(r, 0)); // let the stage render
     const analysis = analyzeSwing(seq);
-    state.video.recordId = null;
     const record = await addSwing({
       seq,
       analysis,
       video: { name: meta.name, sizeBytes: meta.sizeBytes, duration: meta.duration, width: meta.width, height: meta.height, fps: fpsInfo?.reliable ? fpsInfo.fps : null, window: [start, end], model: seq.model, delegate: seq.delegate, processingMs: seq.processingMs },
     });
     state.video.recordId = record.id;
-    renderReplay(currentSwing());
-    $('analyze-status').textContent = `Done in ${(seq.processingMs / 1000).toFixed(1)} s. Record the next swing when ready.`;
+    state.lastDiag = { status: analysis.status, reason: analysis.reason, qc: analysis.qc?.level, frames: seq.frames.length, sampleFps, processingMs: seq.processingMs, delegate: seq.delegate };
     window.__swingDebug = { ...window.__swingDebug, pose: seq, analysis, recordId: record.id };
     video.currentTime = analysis.events?.motionStart ?? start;
+    state.status = null;
+    state.videoPanel = false;
   } catch (err) {
     console.error(err);
-    $('analyze-status').textContent = `Pose analysis failed: ${err.message}`;
+    state.status = { error: `分析失敗：${err.message}` };
     window.__swingDebug = { ...window.__swingDebug, poseError: err.message };
   } finally {
     state.busy = false;
-    $('analyze-btn').disabled = false;
-    prog.hidden = true;
+    render();
+    window.scrollTo(0, 0);
   }
 }
 
-// ---------------------------------------------------------------- demo swings
+// ---------------------------------------------------------------- synthetic (Developer Tools)
 
-const DEMOS = {
+const DEMO_PARAMS = {
   normal: { label: 'normal', params: {} },
   longStride: { label: 'longer stride', params: { strideLength: 1.4 } },
   shortStride: { label: 'shorter stride', params: { strideLength: 0.6 } },
@@ -334,42 +451,148 @@ const DEMOS = {
 };
 
 async function addDemoSwing(kind) {
-  const d = DEMOS[kind];
-  const i = state.swings.length;
-  let seq = generateSwing({ ...naturalVariation(i), ...d.params });
+  if (!state.session) return;
+  const d = DEMO_PARAMS[kind];
+  let seq = generateSwing({ ...naturalVariation(state.swings.length), ...d.params });
   if (d.corrupt) seq = d.corrupt(seq);
   delete seq.truth;
-  await addSwing({ seq, analysis: analyzeSwing(seq), video: { synthetic: true, label: d.label, width: seq.width, height: seq.height, fps: seq.sampleFps } });
+  const analysis = analyzeSwing(seq);
+  await addSwing({ seq, analysis, video: { synthetic: true, label: d.label, width: seq.width, height: seq.height, fps: seq.sampleFps } });
+  state.lastDiag = { status: analysis.status, reason: analysis.reason, qc: analysis.qc?.level, synthetic: d.label };
+  state.tab = 'train';
+  state.status = null;
+  state.videoPanel = false;
+  render();
+  window.scrollTo(0, 0);
+}
+
+// ---------------------------------------------------------------- events
+
+function bindEvents() {
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => {
+    state.tab = b.dataset.tab;
+    state.detailId = null;
+    render();
+    window.scrollTo(0, 0);
+  }));
+  $('session-menu-btn').addEventListener('click', sessionMenu);
+
+  const input = $('video-input');
+  input.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) onFileSelected(file);
+  });
+  $('next-btn').addEventListener('click', (e) => { if (state.busy) e.preventDefault(); });
+  $('next-btn').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !state.busy) { e.preventDefault(); input.click(); }
+  });
+  $('analyze-here').addEventListener('click', () => {
+    const v = $('video');
+    const t = v.currentTime;
+    analyzeVideo(Math.max(0, t - PRE_ROLL_S), Math.min(v.duration, t + POST_ROLL_S));
+  });
+  $('analyze-btn').addEventListener('click', () => {
+    const v = $('video');
+    analyzeVideo(Math.max(0, Number($('range-start').value) || 0), Math.min(v.duration, Number($('range-end').value) || 0));
+  });
+
+  // Setup
+  const keepTypedName = () => { const v = $('player-name')?.value.trim(); if (v) state.setup.name = v; };
+  delegate($('view-setup'), {
+    pickPlayer: ({ name }) => {
+      const p = state.players.find((x) => x.name === name);
+      state.setup = { ...state.setup, name, side: p?.battingSide ?? state.setup.side };
+      render();
+    },
+    pickSide: ({ side }) => { keepTypedName(); state.setup.side = side; render(); },
+    pickFocus: ({ focus: f }) => { keepTypedName(); state.setup.focus = f; render(); },
+    start: startSession,
+    resume: ({ id }) => resumeSession(id),
+  });
+  $('view-setup').addEventListener('input', (e) => {
+    if (e.target.id !== 'player-name') return;
+    const v = e.target.value.trim();
+    const p = state.players.find((x) => x.name === v);
+    state.setup.name = v;
+    if (p?.battingSide) state.setup.side = p.battingSide;
+    document.querySelectorAll('#view-setup .chip').forEach((c) => {
+      const on = c.dataset.name === v;
+      c.classList.toggle('on', on);
+      c.setAttribute('aria-pressed', String(on));
+    });
+  });
+
+  // Practice + Review + Sheet share swing actions.
+  const swingActions = {
+    contact: ({ id, label }) => {
+      const sw = state.swings.find((s) => s.id === id);
+      updateSwing(id, (s) => setContactLabel(s, sw.contact === label ? null : label), false);
+    },
+    openSwing: ({ id }) => { state.detailId = id; render(); $('sheet').scrollTop = 0; },
+    closeSheet: () => { state.detailId = null; render(); },
+    toggleVideo: () => { state.videoPanel = !state.videoPanel; renderPractice(); if (state.videoPanel) $('video-panel').scrollIntoView({ block: 'nearest' }); },
+    exclude: ({ id }, el) => updateSwing(id, (s) => ({ ...s, excludeFromBaseline: el.checked }), true),
+    deleteSwing: ({ id }) => deleteSwing(id),
+    resume: ({ id }) => resumeSession(id),
+  };
+  delegate($('view-practice'), swingActions);
+  delegate($('view-review'), swingActions);
+  delegate($('sheet'), swingActions);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.detailId && $('dialog').hidden) swingActions.closeSheet(); });
+
+  // Settings
+  delegate($('view-settings'), {
+    rename: renameSession,
+    changeFocus,
+    export: exportCurrent,
+    endSession,
+    resume: ({ id }) => resumeSession(id),
+    removePlayer: async ({ name }) => {
+      state.players = state.players.filter((p) => p.name !== name);
+      if (state.store) await state.store.setMeta('players', state.players);
+      render();
+    },
+    toggleDebug: (_d, el) => {
+      state.debug = el.checked;
+      ls.set('swingtraining.debug', state.debug ? '1' : '0');
+      render();
+    },
+    demo: (d) => addDemoSwing(d.demo),
+  });
+  $('view-settings').addEventListener('change', (e) => {
+    if (e.target.id === 'model-variant') {
+      state.poseModel = e.target.value;
+      ls.set('swingtraining.model', state.poseModel);
+    }
+  });
 }
 
 // ---------------------------------------------------------------- boot
 
 async function boot() {
-  $('app-version').textContent = `v${APP_VERSION}`;
-  $('env-status').textContent = checkEnvironment();
+  // Never hang on storage: if IndexedDB doesn't open in time (seen in Chrome
+  // when a previous page was closed mid-upgrade), continue in memory and say so.
   try {
-    state.store = await openStore();
+    state.store = await openStore(globalThis.indexedDB, undefined, { timeoutMs: 4000 });
   } catch (err) {
-    showError('app-error', `Local storage unavailable (${err.message}). Swings will be lost on reload.`);
+    showError(`這個瀏覽器目前無法使用本機儲存（${err.message}），重新整理後資料會遺失。`);
   }
-  $('start-session').addEventListener('click', startSession);
-  $('end-session').addEventListener('click', endSession);
-  $('export-session').addEventListener('click', exportCurrent);
-  $('video-input').addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (file) onFileSelected(file);
-  });
-  $('analyze-btn').addEventListener('click', () => analyzeVideo(Math.max(0, Number($('range-start').value) || 0), Math.min($('video').duration, Number($('range-end').value) || 0)));
-  document.querySelectorAll('[data-demo]').forEach((b) => b.addEventListener('click', () => addDemoSwing(b.dataset.demo)));
+  bindEvents();
   startOverlayLoop();
-
+  await loadSessionsAndPlayers();
+  defaultSetup();
   if (state.store) {
     const active = await state.store.getMeta('activeSession');
-    if (active) await resumeSession(active);
-    if (!state.session) renderSessionList($('session-list'), await state.store.listSessions(), resumeSession);
+    if (active) {
+      const session = await state.store.getSession(active);
+      if (session) {
+        state.session = session;
+        state.swings = await state.store.listSwings(active);
+      }
+    }
   }
-  renderAll();
+  render();
   window.__appReady = true;
 }
 

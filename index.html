@@ -1,129 +1,76 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hant-TW">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" href="data:," />
-  <meta name="theme-color" content="#111418" />
+  <meta name="theme-color" content="#0b0d10" />
   <title>SwingTraining</title>
   <link rel="stylesheet" href="src/styles.css" />
 </head>
 <body>
-  <header class="app-header">
-    <h1>SwingTraining</h1>
-    <span class="version" id="app-version"></span>
+  <header class="topbar">
+    <span class="brand">SwingTraining</span>
+    <button type="button" class="session-chip" id="session-menu-btn" hidden aria-haspopup="dialog">
+      <span id="session-chip-text"></span><span aria-hidden="true" class="dots">⋯</span>
+    </button>
   </header>
 
-  <main id="app">
-    <p class="error" id="app-error" hidden></p>
+  <main id="main">
+    <p class="banner error" id="app-error" role="alert" hidden></p>
 
-    <!-- Session -->
-    <section class="card" id="start-card" hidden>
-      <h2>Start a session</h2>
-      <div class="form">
-        <label>Player (optional) <input id="player-name" type="text" autocomplete="off" /></label>
-        <label>Batting side
-          <select id="batting-side">
-            <option value="">not set</option>
-            <option value="R">right</option>
-            <option value="L">left</option>
-          </select>
-        </label>
-        <label>Note (optional) <input id="session-note" type="text" autocomplete="off" /></label>
-      </div>
-      <button class="btn primary wide" id="start-session">Start session</button>
-      <div id="session-list"></div>
-    </section>
+    <!-- 訓練：Setup (no session) or Practice (active session) -->
+    <section id="view-setup" class="view" aria-label="開始訓練" hidden></section>
 
-    <section class="card session-bar" id="session-card" hidden>
-      <div>
-        <div id="session-title"></div>
-        <div class="small muted" id="session-stats"></div>
-      </div>
-      <div class="session-actions">
-        <button class="btn small-btn" id="export-session">Export</button>
-        <button class="btn small-btn" id="end-session">New session</button>
-      </div>
-    </section>
+    <section id="view-practice" class="view" aria-label="訓練" hidden>
+      <div id="practice-status" aria-live="polite" hidden></div>
 
-    <!-- Capture -->
-    <section class="card" id="capture-card" hidden>
-      <label class="btn primary wide file-btn">
-        Record / choose swing video
-        <input id="video-input" type="file" accept="video/*" hidden />
-      </label>
-      <p class="small muted">Tripod, side view, whole body in frame. Short clips (≤ 10 s) are analyzed automatically.</p>
-      <p class="error" id="video-error" hidden></p>
-
-      <div id="video-block" hidden>
+      <div id="video-panel" class="card video-card" hidden>
         <div class="stage" id="stage">
           <video id="video" playsinline muted controls preload="auto"></video>
           <canvas id="overlay"></canvas>
         </div>
-        <dl class="meta" id="video-meta"></dl>
+        <p class="muted small" id="video-meta"></p>
         <div id="range-block" hidden>
-          <p class="small muted">Long clip: choose the part that contains one swing (include ~1 s before it).</p>
-          <div class="controls">
-            <label>From <input id="range-start" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
-            <label>To <input id="range-end" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
-          </div>
-          <button class="btn primary wide" id="analyze-btn">Analyze swing</button>
+          <button type="button" class="btn btn-primary btn-lg" id="analyze-here">分析這個位置的 Swing</button>
+          <details class="adv">
+            <summary>進階：手動設定秒數</summary>
+            <div class="range-row">
+              <label class="field"><span>開始（秒）</span><input id="range-start" type="number" min="0" step="0.1" inputmode="decimal" /></label>
+              <label class="field"><span>結束（秒）</span><input id="range-end" type="number" min="0" step="0.1" inputmode="decimal" /></label>
+            </div>
+            <button type="button" class="btn btn-secondary" id="analyze-btn">用這段時間分析</button>
+          </details>
         </div>
       </div>
-      <progress id="analyze-progress" max="1" value="0" hidden></progress>
-      <p class="small muted" id="analyze-status"></p>
 
-      <details class="details">
-        <summary class="small">Options</summary>
-        <div class="controls">
-          <label>Pose model
-            <select id="model-variant">
-              <option value="lite">lite (fast)</option>
-              <option value="full" selected>full</option>
-              <option value="heavy">heavy (slow)</option>
-            </select>
-          </label>
-        </div>
-      </details>
-      <details class="details" id="demo-block">
-        <summary class="small">Demo: add synthetic swing (no video needed)</summary>
-        <p class="small muted">Generated stick-figure swings for trying the workflow. They are marked “synthetic” and are not real measurements.</p>
-        <div class="demo-grid">
-          <button class="btn small-btn" data-demo="normal">Normal</button>
-          <button class="btn small-btn" data-demo="longStride">Longer stride</button>
-          <button class="btn small-btn" data-demo="shortStride">Shorter stride</button>
-          <button class="btn small-btn" data-demo="head">More head movement</button>
-          <button class="btn small-btn" data-demo="handPath">Different hand path</button>
-          <button class="btn small-btn" data-demo="late">Later timing</button>
-          <button class="btn small-btn" data-demo="badTracking">Tracking failure</button>
-        </div>
-      </details>
+      <div id="practice-result"></div>
+      <div id="practice-recent"></div>
     </section>
 
-    <!-- Result -->
-    <section class="card" id="result-card" hidden></section>
-    <section class="card" id="replay-card" hidden>
-      <canvas id="replay" class="replay"></canvas>
-      <p class="small muted">Skeleton at peak hand speed · <span class="key cur">current hand path</span> · <span class="key prev">recent valid swings</span></p>
-    </section>
-
-    <!-- History -->
-    <section class="card" id="history-card" hidden>
-      <h2>Recent swings</h2>
-      <div id="history"></div>
-      <details class="details">
-        <summary class="small">Motion metrics vs contact label</summary>
-        <div id="label-view"></div>
-      </details>
-    </section>
-
-    <section class="card">
-      <p class="muted small" id="env-status">Checking environment…</p>
-      <p class="muted small">All analysis runs on this device. Videos are not stored. Results are experimental: field validation pending.</p>
-    </section>
+    <section id="view-review" class="view" aria-label="紀錄" hidden></section>
+    <section id="view-settings" class="view" aria-label="設定" hidden></section>
   </main>
+
+  <!-- Primary practice action, always reachable at the bottom -->
+  <div class="action-bar" id="action-bar" hidden>
+    <label class="btn btn-primary btn-xl next-btn" id="next-btn" role="button" tabindex="0">
+      <span id="next-btn-text">＋ 下一棒</span>
+      <input id="video-input" type="file" accept="video/*" class="visually-hidden" tabindex="-1" />
+    </label>
+  </div>
+
+  <nav class="tabbar" aria-label="主要頁面">
+    <button type="button" class="tab" data-tab="train" aria-current="page"><span aria-hidden="true">⚾</span>訓練</button>
+    <button type="button" class="tab" data-tab="review"><span aria-hidden="true">▤</span>紀錄</button>
+    <button type="button" class="tab" data-tab="settings"><span aria-hidden="true">⚙</span>設定</button>
+  </nav>
+
+  <div id="sheet" class="sheet" hidden></div>
+  <div id="dialog" class="dialog-host" hidden></div>
 
   <script type="module" src="src/main.js"></script>
 </body>

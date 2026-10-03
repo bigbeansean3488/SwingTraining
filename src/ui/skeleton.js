@@ -10,6 +10,8 @@ export function syncCanvas(canvas, video) {
   const w = Math.round(video.clientWidth * dpr);
   const h = Math.round(video.clientHeight * dpr);
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  // Overlay exactly on the (possibly letterboxed/centered) video box.
+  Object.assign(canvas.style, { left: `${video.offsetLeft}px`, top: `${video.offsetTop}px`, width: `${video.clientWidth}px`, height: `${video.clientHeight}px` });
 }
 
 /**

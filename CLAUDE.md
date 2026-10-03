@@ -4,6 +4,10 @@ Guidance for Claude Code working in this repo.
 
 ## Communication
 - Discuss with the user in Traditional Chinese (繁體中文). Code, comments, commits, and docs in English.
+- User-facing UI text: Traditional Chinese (Taiwan) with established baseball/technical terms in English
+  (Session, Swing, Stride, Hand Path, Baseline, Tracking, Good/Medium/Poor …). See docs/ux.md.
+- UI is practice-first (Setup → Practice → Review). Developer controls (synthetic swings, Pose model,
+  environment, diagnostics) live only in 設定 → Developer Tools (or `?debug=1`).
 
 ## Project constraints (V0)
 - Static, local-first web app for iPhone Safari. No backend, no auth, no cloud DB, no LLM, no paid services.
