@@ -46,3 +46,31 @@ main {
 }
 
 .muted { color: var(--muted); }
+
+.small { font-size: 0.8rem; }
+.error { color: var(--bad); margin: 8px 0 0; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #2c343d;
+  background: #232a32;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #06121c; font-weight: 600; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.file-btn { width: 100%; }
+
+.stage { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }
+.stage video, .stage canvas { display: block; width: 100%; height: auto; }
+.stage canvas { position: absolute; inset: 0; height: 100%; pointer-events: none; }
+
+.meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 12px 0 0; font-size: 0.9rem; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; overflow-wrap: anywhere; }

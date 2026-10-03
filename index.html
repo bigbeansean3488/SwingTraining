@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="icon" href="data:," />
   <meta name="theme-color" content="#111418" />
   <title>SwingTraining</title>
   <link rel="stylesheet" href="src/styles.css" />
@@ -16,8 +18,22 @@
 
   <main id="app">
     <section class="card">
-      <p>Swing consistency demo (V0). Local-first — nothing leaves this device.</p>
-      <p class="muted" id="env-status">Checking environment…</p>
+      <label class="btn primary file-btn">
+        Select / record swing video
+        <input id="video-input" type="file" accept="video/*" hidden />
+      </label>
+      <p class="error" id="video-error" hidden></p>
+    </section>
+
+    <section class="card" id="video-card" hidden>
+      <div class="stage">
+        <video id="video" playsinline muted controls preload="auto"></video>
+      </div>
+      <dl class="meta" id="video-meta"></dl>
+    </section>
+
+    <section class="card">
+      <p class="muted small" id="env-status">Checking environment…</p>
     </section>
   </main>
 

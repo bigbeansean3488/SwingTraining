@@ -9,3 +9,4 @@ Thumbs.db
 *.mp4
 *.MP4
 tests/fixtures/videos/
+data/local-videos/
