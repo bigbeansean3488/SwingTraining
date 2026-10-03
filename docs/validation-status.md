@@ -15,6 +15,8 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Frame-rate measurement | YES | YES | PENDING | rVFC deltas; reports `unknown` when inconsistent |
 | Pose extraction (MediaPipe, seek-per-frame) | YES | YES (data model) / visual check on generic video | PENDING | `tests/landmarks.test.js`, `tools/check-pose.mjs` |
 | Skeleton overlay with low-visibility marking | YES | visual check only | PENDING | screenshots from `tools/check-pose.mjs` (not committed: contains a person) |
+| Synthetic swing generator (test fixture) | YES | visual check | n/a | `src/synthetic/swing.js`, `tools/render-synthetic.mjs` |
+| Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far
 
@@ -38,3 +40,20 @@ Content turned out to be an indoor **pitching** arcade (throwing motion), handhe
   same occlusion pattern in side-view batting.
 - Desktop Chrome GPU delegate: ~0.9 s per 4K frame including seek (seek-bound).
   iPhone speed not measured yet.
+
+## M3 QC on real generic footage (IMG_4841.MOV)
+
+`node tools/qc-report.mjs <pose.json>`
+
+| Segment | Level | Main reasons |
+|---|---|---|
+| 4.5–8.5 s throw, full model, 31.6 Hz | poor | best wrist visibility < 0.5 for 33% of frames, longest gap 0.78 s (during the fast arm action) |
+| 50–53 s (walking, crouching to pick up ball) | poor | wrists hidden 52%, gap 0.97 s; size warning (26% of image) |
+
+Wrist visibility pattern in the throw (`#` ≥ 0.5, `+` 0.3–0.5, `.` < 0.3):
+`##########################+++++++++##+++++++++#########++++++++++++++.....+++++####...`
+
+Interpretation: the overlay looks plausible in many of these low-visibility
+frames, so QC may be conservative for fast hand motion. This is the first
+thing to check with field footage (is the low-visibility wrist position still
+accurate?). Thresholds were **not** changed in response.
