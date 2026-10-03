@@ -19,6 +19,7 @@ export const NORMALIZE_DEFAULTS = Object.freeze({
   originMinFrames: 3,   // ...but at least this many frames
   minStrideForDirection: 0.15, // T; below this the stride can't define direction
   headNoseMinCoverage: 0.8,    // use nose as head proxy if tracked this often, else ear midpoint
+  originRange: null,           // [t0, t1] stance reference frames (overrides originFraction)
 });
 
 const side = (s, name) => LM[`${s}_${name}`];
@@ -114,8 +115,17 @@ export function normalizeSwing(seq, { t0, t1, ...overrides } = {}) {
   const T = median(torso);
   if (!T) return { ok: false, reason: 'torso not tracked', times, n: frames.length };
 
-  const nRef = Math.min(frames.length, Math.max(opts.originMinFrames, Math.ceil(frames.length * opts.originFraction)));
-  const refPelvis = tracks.pelvis.slice(0, nRef).filter(Boolean);
+  // Stance reference frames: explicit time range if given (e.g. just before
+  // detected motion start), else the first originFraction of the window.
+  let refIdx;
+  if (opts.originRange) {
+    refIdx = times.map((t, k) => (t >= opts.originRange[0] - 1e-9 && t <= opts.originRange[1] + 1e-9 ? k : -1)).filter((k) => k >= 0);
+  }
+  if (!refIdx?.length) {
+    const nRef = Math.min(frames.length, Math.max(opts.originMinFrames, Math.ceil(frames.length * opts.originFraction)));
+    refIdx = Array.from({ length: nRef }, (_, k) => k);
+  }
+  const refPelvis = refIdx.map((k) => tracks.pelvis[k]).filter(Boolean);
   if (!refPelvis.length) return { ok: false, reason: 'pelvis not tracked at start', times, n: frames.length };
   const origin = [median(refPelvis.map((p) => p[0])), median(refPelvis.map((p) => p[1]))];
 
@@ -132,8 +142,10 @@ export function normalizeSwing(seq, { t0, t1, ...overrides } = {}) {
 
   const points = {};
   const coverage = {};
+  const tracked = {};
   for (const name of POINTS) {
     const tr = tracks[name];
+    tracked[name] = tr.map(Boolean);
     coverage[name] = tr.filter(Boolean).length / Math.max(1, tr.length);
     let xs = tr.map((p) => (p ? (direction * (p[0] - origin[0])) / T : null));
     let ys = tr.map((p) => (p ? (p[1] - origin[1]) / T : null));
@@ -152,8 +164,10 @@ export function normalizeSwing(seq, { t0, t1, ...overrides } = {}) {
     directionSource,
     lead,
     headProxy,
+    refIdx,
     points,
     coverage,
+    tracked,
   };
 }
 

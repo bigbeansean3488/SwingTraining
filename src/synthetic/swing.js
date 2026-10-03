@@ -16,7 +16,7 @@ export const DEFAULT_SWING = Object.freeze({
   width: 1080,
   height: 1920,
   torsoPx: 300,          // image scale: pixels per torso length
-  pelvisX: 0.5,          // initial pelvis center, normalized image coords
+  pelvisX: null,         // initial pelvis center (normalized); null = 0.5 - 0.1·facing, leaving room for the stride
   pelvisY: 0.55,
   facing: 1,             // +1: pitcher toward image right, -1: toward left
   battingSide: 'R',      // lead side = LEFT for 'R', RIGHT for 'L'
@@ -25,7 +25,8 @@ export const DEFAULT_SWING = Object.freeze({
   plant: 0.9,
   swingStart: 0.95,
   swingEnd: 1.25,
-  finish: 1.6,
+  finish: 1.6,           // hands come to rest (end of swing motion)
+  followOverlap: 0.08,   // follow-through starts this long before the arc ends
   // Geometry (T units)
   strideLength: 1.0,     // lead-ankle travel toward pitcher
   pelvisShiftRatio: 0.35,
@@ -74,7 +75,9 @@ function gaussian(rng) {
 export function bodyAt(t, p) {
   const stride = smoothstep(t, p.strideStart, p.plant);
   const swing = smoothstep(t, p.swingStart, p.swingEnd);
-  const follow = smoothstep(t, p.swingEnd, p.finish);
+  // Follow-through overlaps the end of the arc so the hands never stop
+  // between the swing and the finish (as in a real swing).
+  const follow = smoothstep(t, p.swingEnd - p.followOverlap, p.finish);
   const headProg = smoothstep(t, p.strideStart, p.swingEnd);
 
   const pelvis = [p.pelvisShiftRatio * p.strideLength * stride, 0];
@@ -105,7 +108,7 @@ export function bodyAt(t, p) {
   if (follow > 0) {
     const end = arc(a1);
     const fin = [shoulderMid[0] - 0.25, shoulderMid[1] - 0.25];
-    hands = [end[0] + (fin[0] - end[0]) * follow, end[1] + (fin[1] - end[1]) * follow];
+    hands = [hands[0] + (fin[0] - end[0]) * follow, hands[1] + (fin[1] - end[1]) * follow];
   }
 
   const lead = p.battingSide === 'R' ? 'LEFT' : 'RIGHT';
@@ -156,6 +159,7 @@ function visibilityFor(i, p) {
  */
 export function generateSwing(overrides = {}) {
   const p = { ...DEFAULT_SWING, ...overrides };
+  if (p.pelvisX === null) p.pelvisX = 0.5 - 0.1 * p.facing;
   const rng = mulberry32(p.seed);
   const n = Math.round(p.duration * p.fps) + 1;
   const frames = [];
@@ -186,8 +190,7 @@ export function generateSwing(overrides = {}) {
         motionStart: p.strideStart,
         footPlant: p.plant,
         peakHandSpeed: (p.swingStart + p.swingEnd) / 2,
-        swingEnd: p.swingEnd,
-        finish: p.finish,
+        swingEnd: p.finish, // end of hand motion (arc + follow-through)
       },
     },
   };

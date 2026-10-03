@@ -17,6 +17,12 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Skeleton overlay with low-visibility marking | YES | visual check only | PENDING | screenshots from `tools/check-pose.mjs` (not committed: contains a person) |
 | Synthetic swing generator (test fixture) | YES | visual check | n/a | `src/synthetic/swing.js`, `tools/render-synthetic.mjs` |
 | Normalization (spatial + temporal) | YES | YES | PENDING | `tests/normalization.test.js`: translation, scale, mirror, fps, tempo invariance; stride and hand-path differences preserved |
+| Swing event detection (start, plant, peak hand speed, end) | YES | YES | PENDING | `tests/metrics.test.js` timing cases vs known fixture times (30/60/120 fps, varied tempo) |
+| Head stability | YES | YES | PENDING | A < B < C ordering, translation/scale invariance |
+| Stride | YES | YES | PENDING | low variance for similar strides, altered strides > 10 SD |
+| Hand/wrist path | YES | YES | PENDING | similar < different, tempo-robust |
+| Timing features | YES | YES | PENDING | recovered vs truth; +0.1 s delay measured |
+| Single-swing pipeline gating (QC → metrics) | YES | YES | PENDING | rejected swings return no metrics |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far
@@ -58,3 +64,10 @@ Interpretation: the overlay looks plausible in many of these low-visibility
 frames, so QC may be conservative for fast hand motion. This is the first
 thing to check with field footage (is the low-visibility wrist position still
 accurate?). Thresholds were **not** changed in response.
+
+## M5 pipeline on real generic footage
+
+The 4.5–8.5 s throw is rejected: "swing starts before the analyzed window".
+The person walks and the handheld camera moves throughout, so activity never
+falls below threshold before the peak (see `tools/plot-analysis.mjs` output).
+This is correct behavior for this footage and says nothing about swings.
