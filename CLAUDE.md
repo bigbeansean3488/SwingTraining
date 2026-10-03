@@ -8,7 +8,7 @@ Guidance for Claude Code working in this repo.
 ## Project constraints (V0)
 - Static, local-first web app for iPhone Safari. No backend, no auth, no cloud DB, no LLM, no paid services.
 - No bundler: native ES modules, deployable to GitHub Pages as-is. MediaPipe Tasks Vision loaded from CDN.
-- Dev server: `python -m http.server 8000`. Node may not be installed on the dev machine.
+- Dev server: `python -m http.server 8000` (or `node tools/serve.mjs 8000`).
 - Storage: IndexedDB for structured data. Don't keep full videos by default.
 
 ## Architecture rules
@@ -27,13 +27,27 @@ Guidance for Claude Code working in this repo.
 
 ## Milestones
 0. Bootstrap ✅
-1. Video input (upload, playback, metadata)
-2. Pose estimation (MediaPipe, skeleton overlay, visibility)
-3. Pose quality control
-4. Normalization (+ docs/metric-definitions.md, unit tests)
-5. Individual metrics (head, stride, wrist path, timing)
-6. Multi-swing comparison (baseline of previous N valid swings)
-7. Composite motion consistency score
-8. Contact quality label (Good / Medium / Poor)
-9. Practice UX loop
-10. Real iPhone validation (daylight + night field)
+1. Video input ✅
+2. Pose estimation ✅
+3. Pose quality control ✅
+4. Normalization ✅
+5. Individual metrics ✅
+6. Multi-swing comparison ✅
+7. Composite motion consistency score ✅ (scale provisional)
+8. Contact quality label ✅
+9. Practice UX loop ✅
+10. Real iPhone validation — **blocked on field footage**. Follow docs/field-validation.md.
+
+## Hard stop
+Until field footage has been evaluated (docs/field-validation.md F1–F6), do NOT add:
+bat detection, ball tracking, impact audio, automatic contact prediction, coaching AI,
+backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real practice footage.
+
+## Dev commands
+- Node is at `C:\Program Files
+odejs` (in Git Bash: `export PATH="/c/Program Files/nodejs:$PATH"`).
+- `npm test` — unit tests (node:test, synthetic fixtures).
+- `node tools/check-practice.mjs <outDir> [video start end]` — end-to-end practice loop in headless Chrome.
+- `node tools/check-pose.mjs <video> <start> <end> [model] [outDir]` — pose + overlay screenshots.
+- `node tools/evaluate-field.mjs <manifest.csv> <outDir>` — field-validation runner.
+- `node tools/plot-analysis.mjs <out.png> <pose.json | '{"synthetic":{...}}'>` — signals/events plot.
