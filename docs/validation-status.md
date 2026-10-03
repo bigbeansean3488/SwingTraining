@@ -16,6 +16,7 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Pose extraction (MediaPipe, seek-per-frame) | YES | YES (data model) / visual check on generic video | PENDING | `tests/landmarks.test.js`, `tools/check-pose.mjs` |
 | Skeleton overlay with low-visibility marking | YES | visual check only | PENDING | screenshots from `tools/check-pose.mjs` (not committed: contains a person) |
 | Synthetic swing generator (test fixture) | YES | visual check | n/a | `src/synthetic/swing.js`, `tools/render-synthetic.mjs` |
+| Normalization (spatial + temporal) | YES | YES | PENDING | `tests/normalization.test.js`: translation, scale, mirror, fps, tempo invariance; stride and hand-path differences preserved |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far
