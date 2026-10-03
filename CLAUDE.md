@@ -44,8 +44,7 @@ bat detection, ball tracking, impact audio, automatic contact prediction, coachi
 backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real practice footage.
 
 ## Dev commands
-- Node is at `C:\Program Files
-odejs` (in Git Bash: `export PATH="/c/Program Files/nodejs:$PATH"`).
+- Node is at `C:/Program Files/nodejs` (in Git Bash: `export PATH="/c/Program Files/nodejs:$PATH"`).
 - `npm test` — unit tests (node:test, synthetic fixtures).
 - `node tools/check-practice.mjs <outDir> [video start end]` — end-to-end practice loop in headless Chrome.
 - `node tools/check-pose.mjs <video> <start> <end> [model] [outDir]` — pose + overlay screenshots.
