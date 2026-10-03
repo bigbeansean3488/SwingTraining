@@ -31,3 +31,12 @@ export async function openApp({ headless = true } = {}) {
   const close = async () => { await browser.close(); server.close(); };
   return { page, browser, base, logs, close };
 }
+
+/** Start a practice session so the capture UI is available. */
+export async function startSession(page, name = 'Check') {
+  await page.waitForFunction(() => window.__appReady === true, { timeout: 30000 });
+  if (await page.evaluate(() => !!window.__app.session)) return;
+  await page.type('#player-name', name);
+  await page.click('#start-session');
+  await page.waitForFunction(() => !!window.__app.session);
+}

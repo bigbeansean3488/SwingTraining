@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openApp } from './browser.mjs';
+import { openApp, startSession } from './browser.mjs';
 
 const videoPath = process.argv[2];
 const outDir = process.argv[3] || os.tmpdir();
@@ -16,6 +16,7 @@ const fakeMp4 = path.join(tmp, 'corrupt.mp4');
 fs.writeFileSync(fakeMp4, Buffer.alloc(4096, 7));
 
 const { page, logs, close } = await openApp();
+await startSession(page);
 let failures = 0;
 const expect = (cond, msg) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`); if (!cond) failures++; };
 
@@ -24,6 +25,7 @@ async function upload(file) {
   const input = await page.$('#video-input');
   await input.uploadFile(file);
   await page.waitForFunction(() => window.__swingDebug !== undefined, { timeout: 60000 });
+  await page.evaluate(() => document.getElementById('video').pause());
   return page.evaluate(() => window.__swingDebug);
 }
 

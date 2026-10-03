@@ -27,6 +27,8 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Motion consistency score | YES | YES | PENDING | `tests/consistency.test.js`: deterministic, reproducible from stored inputs, stable > moderate > high variability; **half-score scale provisional** |
 | Contact quality label (manual Good/Medium/Poor) | YES | YES | n/a (manual annotation) | `tests/session.test.js`; no inference |
 | Session/swing records + IndexedDB persistence | YES | YES (fake-indexeddb) | PENDING (iPhone Safari storage) | reopen = refresh test; reduced landmarks round-trip to same analysis |
+| Practice workflow UI (session → swing → result → label → next) | YES | YES (headless desktop Chrome, `tools/check-practice.mjs`, 20 checks incl. refresh persistence) | PENDING (iPhone Safari not yet tested) | |
+| Plain-language result wording | YES | YES | PENDING | `tests/interpret.test.js` (no coaching words) |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far

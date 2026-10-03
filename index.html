@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -17,40 +17,111 @@
   </header>
 
   <main id="app">
-    <section class="card">
-      <label class="btn primary file-btn">
-        Select / record swing video
-        <input id="video-input" type="file" accept="video/*" hidden />
-      </label>
-      <p class="error" id="video-error" hidden></p>
-    </section>
+    <p class="error" id="app-error" hidden></p>
 
-    <section class="card" id="video-card" hidden>
-      <div class="stage">
-        <video id="video" playsinline muted controls preload="auto"></video>
-        <canvas id="overlay"></canvas>
-      </div>
-      <dl class="meta" id="video-meta"></dl>
-
-      <div class="controls">
-        <label>From <input id="range-start" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
-        <label>To <input id="range-end" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
-        <label>Model
-          <select id="model-variant">
-            <option value="lite">lite (fast)</option>
-            <option value="full" selected>full</option>
-            <option value="heavy">heavy (slow)</option>
+    <!-- Session -->
+    <section class="card" id="start-card" hidden>
+      <h2>Start a session</h2>
+      <div class="form">
+        <label>Player (optional) <input id="player-name" type="text" autocomplete="off" /></label>
+        <label>Batting side
+          <select id="batting-side">
+            <option value="">not set</option>
+            <option value="R">right</option>
+            <option value="L">left</option>
           </select>
         </label>
+        <label>Note (optional) <input id="session-note" type="text" autocomplete="off" /></label>
       </div>
-      <button class="btn primary file-btn" id="analyze-btn">Analyze pose</button>
+      <button class="btn primary wide" id="start-session">Start session</button>
+      <div id="session-list"></div>
+    </section>
+
+    <section class="card session-bar" id="session-card" hidden>
+      <div>
+        <div id="session-title"></div>
+        <div class="small muted" id="session-stats"></div>
+      </div>
+      <div class="session-actions">
+        <button class="btn small-btn" id="export-session">Export</button>
+        <button class="btn small-btn" id="end-session">New session</button>
+      </div>
+    </section>
+
+    <!-- Capture -->
+    <section class="card" id="capture-card" hidden>
+      <label class="btn primary wide file-btn">
+        Record / choose swing video
+        <input id="video-input" type="file" accept="video/*" hidden />
+      </label>
+      <p class="small muted">Tripod, side view, whole body in frame. Short clips (≤ 10 s) are analyzed automatically.</p>
+      <p class="error" id="video-error" hidden></p>
+
+      <div id="video-block" hidden>
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted controls preload="auto"></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <dl class="meta" id="video-meta"></dl>
+        <div id="range-block" hidden>
+          <p class="small muted">Long clip: choose the part that contains one swing (include ~1 s before it).</p>
+          <div class="controls">
+            <label>From <input id="range-start" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
+            <label>To <input id="range-end" type="number" min="0" step="0.1" inputmode="decimal" /> s</label>
+          </div>
+          <button class="btn primary wide" id="analyze-btn">Analyze swing</button>
+        </div>
+      </div>
       <progress id="analyze-progress" max="1" value="0" hidden></progress>
-      <p class="muted small" id="analyze-status"></p>
-      <dl class="meta" id="tracking-summary"></dl>
+      <p class="small muted" id="analyze-status"></p>
+
+      <details class="details">
+        <summary class="small">Options</summary>
+        <div class="controls">
+          <label>Pose model
+            <select id="model-variant">
+              <option value="lite">lite (fast)</option>
+              <option value="full" selected>full</option>
+              <option value="heavy">heavy (slow)</option>
+            </select>
+          </label>
+        </div>
+      </details>
+      <details class="details" id="demo-block">
+        <summary class="small">Demo: add synthetic swing (no video needed)</summary>
+        <p class="small muted">Generated stick-figure swings for trying the workflow. They are marked “synthetic” and are not real measurements.</p>
+        <div class="demo-grid">
+          <button class="btn small-btn" data-demo="normal">Normal</button>
+          <button class="btn small-btn" data-demo="longStride">Longer stride</button>
+          <button class="btn small-btn" data-demo="shortStride">Shorter stride</button>
+          <button class="btn small-btn" data-demo="head">More head movement</button>
+          <button class="btn small-btn" data-demo="handPath">Different hand path</button>
+          <button class="btn small-btn" data-demo="late">Later timing</button>
+          <button class="btn small-btn" data-demo="badTracking">Tracking failure</button>
+        </div>
+      </details>
+    </section>
+
+    <!-- Result -->
+    <section class="card" id="result-card" hidden></section>
+    <section class="card" id="replay-card" hidden>
+      <canvas id="replay" class="replay"></canvas>
+      <p class="small muted">Skeleton at peak hand speed · <span class="key cur">current hand path</span> · <span class="key prev">recent valid swings</span></p>
+    </section>
+
+    <!-- History -->
+    <section class="card" id="history-card" hidden>
+      <h2>Recent swings</h2>
+      <div id="history"></div>
+      <details class="details">
+        <summary class="small">Motion metrics vs contact label</summary>
+        <div id="label-view"></div>
+      </details>
     </section>
 
     <section class="card">
       <p class="muted small" id="env-status">Checking environment…</p>
+      <p class="muted small">All analysis runs on this device. Videos are not stored. Results are experimental: field validation pending.</p>
     </section>
   </main>
 

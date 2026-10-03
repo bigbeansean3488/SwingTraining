@@ -27,9 +27,12 @@ export function drawSkeleton(canvas, lm, { threshold = VIS_THRESHOLD, trails = [
   if (!lm) return;
 
   ctx.lineCap = 'round';
+  // Landmarks absent from stored (reduced) data are [0, 0, 0, 0]; skip them.
+  const absent = (p) => p[3] === 0 && p[0] === 0 && p[1] === 0;
   for (const [a, b] of SKELETON_EDGES) {
     const pa = lm[a];
     const pb = lm[b];
+    if (absent(pa) || absent(pb)) continue;
     const ok = pa[3] >= threshold && pb[3] >= threshold;
     ctx.strokeStyle = ok ? OK : LOW;
     ctx.lineWidth = lw;
@@ -42,6 +45,7 @@ export function drawSkeleton(canvas, lm, { threshold = VIS_THRESHOLD, trails = [
   ctx.setLineDash([]);
   for (let i = 0; i < NUM_LANDMARKS; i++) {
     const p = lm[i];
+    if (absent(p)) continue;
     ctx.fillStyle = p[3] >= threshold ? '#fff' : LOW;
     ctx.beginPath();
     ctx.arc(p[0] * W, p[1] * H, lw * 1.2, 0, Math.PI * 2);

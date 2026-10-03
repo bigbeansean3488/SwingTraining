@@ -4,7 +4,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openApp } from './browser.mjs';
+import { openApp, startSession } from './browser.mjs';
+import { trackingCoverage } from '../src/pose/landmarks.js';
 
 const [videoPath, start = '0', end = '5', variant = 'full', outDir = os.tmpdir(), shots = '6', fps] = process.argv.slice(2);
 if (!videoPath) { console.error('usage: node tools/check-pose.mjs <video> <start> <end> [variant] [outDir] [shots] [fps]'); process.exit(2); }
@@ -12,6 +13,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const { page, logs, close } = await openApp();
 try {
+  await startSession(page);
   const input = await page.$('#video-input');
   await input.uploadFile(videoPath);
   await page.waitForFunction(() => window.__swingDebug?.meta || window.__swingDebug?.error, { timeout: 60000 });
@@ -22,11 +24,13 @@ try {
     if (f) window.__forceSampleFps = Number(f);
   }, start, end, variant, fps);
   const t0 = Date.now();
-  await page.click('#analyze-btn');
+  if (await page.$eval('#range-block', (e) => !e.hidden)) await page.click('#analyze-btn');
   await page.waitForFunction(() => window.__swingDebug?.pose || window.__swingDebug?.poseError, { timeout: 30 * 60000, polling: 1000 });
-  const dbg = await page.evaluate(() => ({ pose: window.__swingDebug.pose, coverage: window.__swingDebug.coverage, err: window.__swingDebug.poseError }));
+  const dbg = await page.evaluate(() => ({ pose: window.__swingDebug.pose, err: window.__swingDebug.poseError, status: window.__swingDebug.analysis?.status, reason: window.__swingDebug.analysis?.reason }));
   if (dbg.err) throw new Error(dbg.err);
-  const { pose, coverage } = dbg;
+  const { pose } = dbg;
+  const coverage = trackingCoverage(pose);
+  console.log('analysis', dbg.status, dbg.reason ?? '');
   console.log(`model=${pose.model} delegate=${pose.delegate} frames=${pose.frames.length} wall=${((Date.now() - t0) / 1000).toFixed(1)}s`);
   console.log('poseFraction', coverage.poseFraction.toFixed(3));
   for (const [g, v] of Object.entries(coverage.groups)) console.log(`  ${g.padEnd(10)} ${(v * 100).toFixed(1)}%`);
