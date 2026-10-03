@@ -28,7 +28,9 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Contact quality label (manual Good/Medium/Poor) | YES | YES | n/a (manual annotation) | `tests/session.test.js`; no inference |
 | Session/swing records + IndexedDB persistence | YES | YES (fake-indexeddb) | PENDING (iPhone Safari storage) | reopen = refresh test; reduced landmarks round-trip to same analysis |
 | Practice workflow UI (session → swing → result → label → next) | YES | YES (headless desktop Chrome, `tools/check-practice.mjs`, 20 checks incl. refresh persistence) | PENDING (iPhone Safari not yet tested) | |
-| Plain-language result wording | YES | YES | PENDING | `tests/interpret.test.js` (no coaching words) |
+| Plain-language result wording (Traditional Chinese) | YES | YES | PENDING | `tests/interpret.test.js` (no coaching words, no Simplified Chinese) |
+| Practice-first UI (Setup / Practice / Review / Settings) | YES | YES (headless Chrome 375/390/430 px, `tools/check-practice.mjs` 50 checks) | PENDING — not yet used by players at practice | docs/ux.md |
+| Head Stability display score (one-sided) | YES | YES | PENDING | metric-definitions §6.1 |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far

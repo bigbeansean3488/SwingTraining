@@ -31,7 +31,7 @@ const { page, logs, close } = await openApp();
 const results = [];
 try {
   await startSession(page, `field ${path.basename(manifestPath)}`);
-  await page.evaluate((m) => { document.getElementById('model-variant').value = m; }, model);
+  await page.evaluate((m) => { window.__app.poseModel = m; }, model);
   for (const [i, row] of rows.entries()) {
     const file = path.join(baseDir, row.file);
     if (!fs.existsSync(file)) { console.log(`SKIP ${row.file}: not found`); continue; }

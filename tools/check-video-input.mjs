@@ -31,8 +31,8 @@ async function upload(file) {
 
 try {
   const bad1 = await upload(txt);
-  expect(bad1.error && /Not a video/.test(bad1.error), `text file rejected: ${bad1.error}`);
-  expect(await page.$eval('#video-error', (e) => !e.hidden), 'error message visible');
+  expect(bad1.error && /不是影片檔/.test(bad1.error), `text file rejected: ${bad1.error}`);
+  expect(/無法讀取這支影片/.test(await page.$eval('#practice-status', (e) => e.innerText)), 'error message visible (Traditional Chinese)');
 
   const bad2 = await upload(fakeMp4);
   expect(!!bad2.error, `corrupt .mp4 rejected: ${bad2.error}`);
@@ -43,7 +43,7 @@ try {
     console.log('metadata', JSON.stringify(ok.meta), 'fps', JSON.stringify(ok.fpsInfo));
     expect(ok.meta.duration > 0 && ok.meta.width > 0, 'duration and dimensions present');
     expect(ok.fpsInfo.fps === null || (ok.fpsInfo.fps > 1 && ok.fpsInfo.fps < 300), 'fps either null or plausible');
-    expect(await page.$eval('#video-error', (e) => e.hidden), 'error cleared after valid load');
+    expect(!/無法讀取/.test(await page.$eval('#practice-status', (e) => e.innerText)), 'error cleared after valid load');
     const playable = await page.evaluate(async () => {
       const v = document.getElementById('video');
       const t0 = v.currentTime; await v.play(); await new Promise((r) => setTimeout(r, 800)); v.pause();

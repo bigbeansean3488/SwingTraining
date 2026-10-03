@@ -20,7 +20,7 @@ try {
   await page.evaluate((s, e, v, f) => {
     document.getElementById('range-start').value = s;
     document.getElementById('range-end').value = e;
-    document.getElementById('model-variant').value = v;
+    window.__app.poseModel = v;
     if (f) window.__forceSampleFps = Number(f);
   }, start, end, variant, fps);
   const t0 = Date.now();
