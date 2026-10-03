@@ -283,3 +283,71 @@ Reference synthetic session (`src/synthetic/session.js`, `tests/comparison.test.
 | 3 | near baseline | 0.17 | 0.18 | 0.07 | 0.52 | 0.27 |
 | 4 | longer stride | 0.41 | **7.77** | 0.32 | 0.40 | **5.60** |
 | 5 | more head movement | **10.90** | 0.49 | 0.18 | 0.69 | 0.73 |
+
+---
+
+## 6. Motion consistency score (`src/analysis/consistency.js`)
+
+**What it is:** how close the current swing is to the player's recent valid
+swings (the §5 baseline), on a 0–100 scale. **What it is not:** a measure of
+swing quality, power, or batting performance. A player can be consistently
+wrong. Validation: `UNIT_VALIDATED`, `FIELD_VALIDATED: PENDING`.
+
+Inputs — absolute differences from the baseline (stored with every swing as
+`consistencyInputs`, so the score can be recomputed or revised later):
+
+| component | Δ | unit |
+|---|---|---|
+| head | \|head − baseline mean\| (§4.1 value) | T |
+| stride | \|stride − baseline mean\| (§4.2 value) | T |
+| timing | max(\|Δ startToPeak\|, \|Δ plantToPeak\|) vs baseline means | s |
+| wristPath | D(current path, baseline mean path) (§5) | T |
+| pose | mean-over-points D(current, baseline mean pose trajectory) (§5) | T |
+
+Component score and composite:
+
+```
+s_i = 100 / (1 + (Δ_i / h_i)²)          h_i = half-score difference
+score = Σ w_i' · s_i ,  w_i' = w_i / Σ_{available} w_j     (rounded to integer)
+```
+
+| component | weight w_i | half-score h_i (PROVISIONAL) |
+|---|---|---|
+| head | 0.2 | 0.10 T |
+| stride | 0.2 | 0.15 T |
+| timing | 0.2 | 0.05 s |
+| wristPath | 0.2 | 0.10 T |
+| pose | 0.2 | 0.10 T |
+
+Why absolute differences rather than the player-relative z of §5: dividing by
+the player's own variability would make a consistently inconsistent player
+look perfectly consistent. The relative z values are still shown in the UI
+as "compared with your usual" wording.
+
+Why equal weights: no evidence yet that any component matters more.
+Half-score values are initial guesses (a component scores 50 when the swing
+differs from baseline by h_i). **Calibrate on field data**: e.g. set h_i to a
+multiple of the typical within-player difference among normal swings, then
+check the score separates deliberately altered swings.
+
+Limitations: the score depends on baseline size (1–5 swings); with 1 baseline
+swing it is a pairwise similarity. A swing with missing components is scored
+on the remaining ones (renormalized weights, listed in the result).
+
+Synthetic results (`tests/consistency.test.js`):
+
+| reference session swing | score | lowest components |
+|---|---|---|
+| 2 near baseline | 97 | — |
+| 3 near baseline | 99 | — |
+| 4 longer stride | 70 | stride 13, pose 44 |
+| 5 more head movement | 72 | head 9 |
+
+| synthetic session (8 swings) | mean score |
+|---|---|
+| stable (variation × 0.5) | 99.7 |
+| moderately variable (× 2.5) | 94.1 |
+| highly variable (× 6) | 80.7 |
+
+The ordering is regression-tested; the spread between sessions depends on the
+provisional h_i and must not be read as calibrated.

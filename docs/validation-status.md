@@ -24,6 +24,7 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Timing features | YES | YES | PENDING | recovered vs truth; +0.1 s delay measured |
 | Single-swing pipeline gating (QC → metrics) | YES | YES | PENDING | rejected swings return no metrics |
 | Multi-swing comparison (baseline of last 5 valid swings) | YES | YES | PENDING | `tests/comparison.test.js`: reference session flags swing 4 by stride and swing 5 by head; rejected swings excluded |
+| Motion consistency score | YES | YES | PENDING | `tests/consistency.test.js`: deterministic, reproducible from stored inputs, stable > moderate > high variability; **half-score scale provisional** |
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 
 ## Test footage available so far
