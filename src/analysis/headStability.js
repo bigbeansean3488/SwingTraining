@@ -1,5 +1,8 @@
 // Head stability: how far the head proxy moves from its stance position
-// during the swing, in the anchored body frame (T units). Lower = steadier.
+// during the swing, relative to the per-frame pelvis (T units). Lower =
+// steadier. Relative-to-pelvis keeps this independent of stride/weight shift
+// (which the stride metric already captures); the anchored (camera-fixed)
+// displacement is reported in diagnostics.
 import { indicesBetween, trackedFraction, medianPoint, pointAt, confidenceFrom, round } from './metricUtil.js';
 import { relativeToPelvis } from './normalize.js';
 import { METRIC_VALIDATION } from './validation.js';
@@ -41,17 +44,21 @@ export function headStability(norm, events, refIdx, qcLevel = 'good') {
     maxRel = 0;
     for (const k of idx) if (rel.x[k] !== null) maxRel = Math.max(maxRel, Math.hypot(rel.x[k] - relRefPt[0], rel.y[k] - relRefPt[1]));
   }
+  if (maxRel === null) {
+    return { value: null, confidence: 0, diagnostics: { reason: 'pelvis not tracked at stance' }, validation: METRIC_VALIDATION.headStability };
+  }
   return {
-    value: round(maxD),
+    value: round(maxRel),
     unit: 'T',
     confidence: confidenceFrom(trackedFraction(norm, 'head', idx), qcLevel),
     diagnostics: {
-      maxDisplacement: round(maxD),
-      rmsDisplacement: round(count ? Math.sqrt(sumSq / count) : null),
-      pathLength: round(path),
+      maxDisplacementVsPelvis: round(maxRel),
+      // Anchored (stance-pelvis origin, camera-fixed) variants:
+      maxDisplacementAnchored: round(maxD),
+      rmsDisplacementAnchored: round(count ? Math.sqrt(sumSq / count) : null),
+      pathLengthAnchored: round(path),
       forwardAtPeak: atPeak ? round(atPeak[0] - ref[0]) : null, // + toward pitcher
       dropAtPeak: atPeak ? round(atPeak[1] - ref[1]) : null,    // + downward
-      maxDisplacementVsPelvis: round(maxRel),
       headProxy: norm.headProxy,
     },
     validation: METRIC_VALIDATION.headStability,

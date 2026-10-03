@@ -179,19 +179,21 @@ statistical probability.
 
 ### 4.1 Head stability (`headStability.js`)
 
-`ref` = median head position over the stance reference frames.
-**value = max over frames in [motionStart, swingEnd] of |head − ref|** (T, anchored frame).
-Lower = steadier. Diagnostics: RMS displacement, path length, forward (+x) and
-drop (+y) at peak hand speed, max displacement relative to the per-frame
-pelvis (moving origin), head proxy used.
+Head position relative to the per-frame pelvis: `h_rel(k) = head(k) − pelvis(k)`
+(T units). `ref` = mean `h_rel` over the stance reference frames.
+**value = max over frames in [motionStart, swingEnd] of |h_rel − ref|**. Lower = steadier.
 
-The anchored value is head movement as a fixed tripod camera sees it (scaled
-by body size). It includes whole-body drift; the pelvis-relative value
-separates head motion from body drift. Which one tracks contact quality better
-is an open question for field data.
+Why pelvis-relative: in the anchored (camera-fixed) frame, a longer stride
+carries the whole body — and the head — forward, so head and stride would
+measure the same thing. Pelvis-relative head movement isolates head motion
+over the body (trunk lean/drop, head bob). The anchored values are kept in
+diagnostics (`maxDisplacementAnchored`, `rmsDisplacementAnchored`,
+`pathLengthAnchored`, `forwardAtPeak`, `dropAtPeak`). Which variant tracks
+contact quality better is an open question for field data.
 
-Synthetic check (expected A < B < C): A 0.37, B 0.51, C 0.77 (pelvis-relative:
-0.03, 0.16, 0.43; the synthetic body drifts 0.35 T forward with the stride).
+Synthetic check (expected A < B < C): pelvis-relative A 0.03, B 0.16, C 0.43
+(anchored: 0.37, 0.51, 0.77 — the synthetic body drifts 0.35 T with the
+stride). A 0.4 T longer stride changes the value by < 0.03 T.
 
 ### 4.2 Stride (`stride.js`)
 
@@ -208,15 +210,18 @@ recovered within 0.06 T.
 
 ### 4.3 Hand/wrist path (`wristPath.js`)
 
-The hands point resampled over [motionStart, swingEnd] at 51 samples with a
-piecewise-linear time warp that puts footPlant at u = 0.5 and peakHandSpeed
-at u = 0.8 (conventions; they make paths comparable when tempo changes, and
-timing is measured separately). **value = the 51-point path** (T).
-Diagnostics: path length, max forward / back extent, lowest / highest point.
-Distance between two paths = D(A, B) from §2.4.
+The hands point **relative to the per-frame pelvis** (same reasoning as §4.1:
+stride translation is measured by the stride metric), resampled over
+[motionStart, swingEnd] at 51 samples with a piecewise-linear time warp that
+puts footPlant at u = 0.5 and peakHandSpeed at u = 0.8 (conventions; they make
+paths comparable when tempo changes, and timing is measured separately).
+**value = the 51-point path** (T). Diagnostics: path length, max forward /
+back extent, lowest / highest point. Distance between two paths = D(A, B)
+from §2.4.
 
-Synthetic check: similar pair D = 0.016 T, altered path D = 0.186 T; a pure
-tempo change stays < 1/3 of the altered-path distance.
+Synthetic check: similar pair ≪ altered path (> 3×); a pure tempo change
+stays < 1/3 of the altered-path distance; a longer stride leaves the
+deviation < 2.
 
 ### 4.4 Timing (`timing.js`)
 
@@ -224,3 +229,57 @@ value = { startToPlant, plantToPeak, startToPeak, peakToEnd, total } in
 seconds. Synthetic check: all events within tolerance at 30/60/120 fps and for
 different tempos; a swing delayed by 0.1 s after plant is measured as
 +0.10 ± 0.02 s.
+
+---
+
+## 5. Multi-swing comparison (`src/analysis/comparison.js`)
+
+**Baseline** = the most recent N = 5 swings before the current one that are
+usable (QC not poor) and not manually excluded. Rejected swings never enter it.
+With no usable previous swing, the current swing only starts the baseline.
+
+**Scalar components** — head (§4.1 value), stride (§4.2 value), timing
+(startToPeak, plantToPeak):
+
+```
+m = mean(baseline values)
+s = sample SD (n−1) of baseline values (undefined if n < 2)
+spread = max(s, floor)
+z = (x − m) / spread          deviation = |z|
+```
+
+`rank` reports how many baseline values are greater / smaller (e.g. "more
+stable than all of the last 5 swings" = head rank.greater = 5).
+
+**Trajectory components** — wrist path (§4.3) and full-body pose trajectory
+(10 points: head, shoulderMid, pelvis, hands, lead/rear elbow, knee, ankle;
+anchored frame, 51 event-warped samples; distance = mean over points of D):
+
+```
+distance = D(current, pointwise mean of baseline)
+typical  = mean over baseline swings i of D(swing_i, mean of the other baseline swings)   (n ≥ 2)
+deviation = distance / max(typical, floor)
+```
+
+The pose component stays in the anchored frame on purpose: it is the
+whole-body summary and should see stride/weight-shift changes too.
+
+**Noise floors** (measurement resolution; prevent near-identical baselines
+from inflating trivial differences): head 0.03 T, stride 0.05 T, timing
+0.033 s (~2 frames at 60 fps), wrist path 0.02 T, pose 0.02 T. These are
+initial values from synthetic noise and frame resolution, to be re-estimated
+from field repeatability data.
+
+Interpretation of deviation: ≈ 1 is a typical swing-to-swing difference for
+this player; larger values are progressively unusual. No fixed cut-off is
+claimed to be meaningful yet.
+
+Reference synthetic session (`src/synthetic/session.js`, `tests/comparison.test.js`):
+
+| swing | label | head | stride | timing | wristPath | pose |
+|---|---|---|---|---|---|---|
+| 1 | baseline | — | — | — | — | — |
+| 2 | near baseline | 0.13 | 0.17 | 0.40 | 1.27 | 0.49 |
+| 3 | near baseline | 0.17 | 0.18 | 0.07 | 0.52 | 0.27 |
+| 4 | longer stride | 0.41 | **7.77** | 0.32 | 0.40 | **5.60** |
+| 5 | more head movement | **10.90** | 0.49 | 0.18 | 0.69 | 0.73 |

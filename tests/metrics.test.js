@@ -76,19 +76,24 @@ test('HEAD: stationary (A) < moderate (B) < large (C) displacement', () => {
   const B = run({ headMoveX: 0.15, headMoveY: 0.06, seed: 12 }).metrics.headStability;
   const C = run({ headMoveX: 0.4, headMoveY: 0.15, seed: 13 }).metrics.headStability;
   assert.ok(A.value < B.value && B.value < C.value, `A=${A.value} B=${B.value} C=${C.value}`);
-  // Anchored frame: head displacement = injected head offset + body drift
-  // (synthetic shoulders follow the pelvis shift of 0.35 T).
-  assert.ok(Math.abs(C.value - Math.hypot(0.4 + 0.35, 0.15)) < 0.05, `C=${C.value}`);
-  // Relative to the moving pelvis only the injected head offset remains.
-  assert.ok(Math.abs(C.diagnostics.maxDisplacementVsPelvis - Math.hypot(0.4, 0.15)) < 0.05, `C vs pelvis=${C.diagnostics.maxDisplacementVsPelvis}`);
+  // Value is relative to the moving pelvis: only the injected head offset remains.
+  assert.ok(Math.abs(C.value - Math.hypot(0.4, 0.15)) < 0.05, `C=${C.value}`);
+  // Anchored (camera-fixed) diagnostic also includes the 0.35 T body drift.
+  assert.ok(Math.abs(C.diagnostics.maxDisplacementAnchored - Math.hypot(0.4 + 0.35, 0.15)) < 0.05, `C anchored=${C.diagnostics.maxDisplacementAnchored}`);
   assert.ok(C.diagnostics.forwardAtPeak > 0.2, 'forward drift reported in diagnostics');
+});
+
+test('HEAD: longer stride alone does not change head stability (components stay separate)', () => {
+  const normal = run({ seed: 22 }).metrics.headStability.value;
+  const longer = run({ seed: 23, strideLength: 1.4 }).metrics.headStability.value;
+  assert.ok(Math.abs(longer - normal) < 0.03, `normal ${normal} longer-stride ${longer}`);
 });
 
 test('HEAD: oscillating head (wobble) scores worse than steady head with same drift', () => {
   const steady = run({ seed: 21 }).metrics.headStability;
   const wobble = run({ seed: 21, headWobble: 0.12 }).metrics.headStability;
   assert.ok(wobble.value > steady.value + 0.05);
-  assert.ok(wobble.diagnostics.pathLength > 2 * steady.diagnostics.pathLength);
+  assert.ok(wobble.diagnostics.pathLengthAnchored > 1.5 * steady.diagnostics.pathLengthAnchored);
 });
 
 test('HEAD: invariant to camera translation/scale', () => {
