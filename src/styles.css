@@ -102,7 +102,12 @@ details.card > summary, details > summary { cursor: pointer; min-height: 44px; d
   background: linear-gradient(to top, var(--bg) 70%, rgba(11, 13, 16, 0));
 }
 .action-bar[hidden] { display: none; }
-.action-bar .next-btn { max-width: 528px; margin: 0 auto; display: flex; }
+.action-row { max-width: 528px; margin: 0 auto; display: flex; gap: 10px; }
+.action-bar .next-btn { flex: 1; display: flex; }
+.action-bar .rec-btn { flex: 2; }
+.action-bar .rec-btn[hidden] { display: none; }
+.action-bar .next-btn.btn-secondary { flex: 1; font-size: 1rem; }
+.rec-btn { background: #e5534b; color: #fff; }
 .next-btn.is-busy { background: var(--surface-2); color: var(--muted); cursor: progress; }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
@@ -334,3 +339,33 @@ details.card > summary, details > summary { cursor: pointer; min-height: 44px; d
   main { padding-top: 20px; }
   .focus-score { font-size: 6.5rem; }
 }
+
+/* ---------------------------------------------------------------- in-app recorder */
+.recorder-host { position: fixed; inset: 0; z-index: 60; background: #000; }
+.recorder-host[hidden] { display: none; }
+body.rec-open { overflow: hidden; }
+.rec { height: 100%; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+.rec-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.rec-video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.rec-overlay { position: absolute; pointer-events: none; }
+.rec-timer {
+  position: absolute; top: calc(12px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.65); color: #fff; padding: 6px 14px; border-radius: 16px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.rec-timer[hidden] { display: none; }
+.rec-dot { color: #ff5a4f; }
+.rec-panel { background: var(--bg); padding: 12px 16px 14px; border-top: 1px solid var(--line); }
+.rec-title { font-weight: 800; font-size: 1.1rem; margin: 0 0 6px; }
+.rec-checks { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 2px; font-size: 0.95rem; }
+.rec-checks .ok { color: var(--ok); }
+.rec-checks .bad { color: var(--warn); }
+.rec-checks .todo { color: var(--muted); }
+.rec-tip { margin: 0 0 10px; }
+.rec-actions { display: flex; gap: 10px; }
+.rec-actions .btn-secondary { flex: 1; }
+.rec-actions .btn-primary { flex: 2; }
+.rec-actions [data-rec="record"] { background: #e5534b; color: #fff; }
+.rec-actions [data-rec="record"]:disabled { opacity: 0.5; }
+.rec-main.is-recording { background: #e5534b; color: #fff; }
+.save-row { margin: 0 0 14px; display: grid; gap: 6px; }
+.save-row p { margin: 0; }

@@ -62,10 +62,10 @@ try {
   expect(await page.evaluate(() => window.__app.session.focus === 'stride' && window.__app.session.playerName === 'Sean' && window.__app.session.battingSide === 'R'), 'session created with player, side, focus');
 
   // ---------------- Practice (empty)
-  expect(await visible('#next-btn') && /＋ 加入影片/.test(await text('#next-btn')), 'dominant ＋ 加入影片 action visible');
+  expect(await visible('#record-btn') && /● 錄影/.test(await text('#record-btn')) && /選影片/.test(await text('#next-btn')), 'dominant ● 錄影 action + 選影片 visible');
   expect(/連續打 N 球/.test(await text('#practice-result')), 'empty state explains the record-N-swings workflow');
-  const nb = await page.$eval('#next-btn', (e) => { const r = e.getBoundingClientRect(); return { h: r.height, bottom: r.bottom, vh: innerHeight }; });
-  expect(nb.h >= 60 && nb.bottom > nb.vh * 0.75, `＋ 加入影片 large and near the bottom (${nb.h}px, bottom ${Math.round(nb.bottom)}/${nb.vh})`);
+  const nb = await page.$eval('#record-btn', (e) => { const r = e.getBoundingClientRect(); return { h: r.height, bottom: r.bottom, vh: innerHeight }; });
+  expect(nb.h >= 60 && nb.bottom > nb.vh * 0.75, `● 錄影 large and near the bottom (${nb.h}px, bottom ${Math.round(nb.bottom)}/${nb.vh})`);
   expect(!(await visible('#range-block')) && !(await visible('#range-start')), 'no From/To trim controls by default');
   expect(!(await visible('[data-demo]')), 'no synthetic controls during practice');
   await shot('ui-practice-empty');

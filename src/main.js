@@ -17,6 +17,7 @@ import { FOCUS, SIDE_ZH } from './app/interpret.js';
 import { openStore } from './storage/indexedDb.js';
 import { $, delegate } from './ui/dom.js';
 import { openDialog } from './ui/dialog.js';
+import { openRecorder, canRecord } from './ui/recorder.js';
 import { renderSetup, GUEST } from './ui/views/setup.js';
 import { renderStatus, renderResult, renderRecent, renderBatch } from './ui/views/practice.js';
 import { renderReview } from './ui/views/review.js';
@@ -54,6 +55,7 @@ const state = {
   batch: null, // { ids, found, skipped, stopped } — swings found in the last long recording
   multiSwing: ls.get('swingtraining.multiSwing') !== '0', // long recordings: find every swing (false: choose one manually)
   abort: null,
+  canRecord: canRecord(), // in-app camera recording with framing guide (https + MediaRecorder)
   busy: false,
   lastDiag: null,
 };
@@ -146,15 +148,61 @@ function renderPractice() {
   else if (state.batch) renderBatch(res, state.batch, state.swings, focus(), { playable: state.video.poses });
   else renderResult(res, n, focus(), state.swings.slice(0, -1), { showVideoButton: !!n && n.id === state.video.recordId });
   renderRecent($('practice-recent'), state.swings, focus());
+  renderSave();
 }
 
 function renderNextButton() {
   const btn = $('next-btn');
   const busy = state.busy;
+  const rec = state.canRecord && !busy;
   btn.classList.toggle('is-busy', busy);
   btn.setAttribute('aria-disabled', String(busy));
   $('video-input').disabled = busy;
-  $('next-btn-text').textContent = busy ? '分析中…' : '＋ 加入影片';
+  // With a camera: 錄影 (guided, primary) + 選影片 (library). Otherwise one button.
+  $('record-btn').hidden = !rec;
+  btn.classList.toggle('btn-secondary', rec);
+  btn.classList.toggle('btn-primary', !rec);
+  $('next-btn-text').textContent = busy ? '分析中…' : rec ? '選影片' : '＋ 加入影片';
+}
+
+function renderSave() {
+  const el = $('practice-save');
+  const f = state.video.file;
+  if (state.busy || !f?.recorded) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="save-row">
+    <p class="muted small">這段影片是在 App 裡錄的，沒有存進相簿。${f.saved ? '已匯出。' : '想留下來（例如場地驗證）就先儲存。'}</p>
+    <button type="button" class="btn btn-secondary" data-action="saveVideo">${f.saved ? '再存一次影片' : '儲存這段影片'}</button>
+  </div>`;
+}
+
+async function saveVideo() {
+  const f = state.video.file;
+  if (!f) return;
+  try {
+    if (navigator.canShare?.({ files: [f] })) {
+      await navigator.share({ files: [f], title: f.name });
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(f);
+      a.download = f.name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+    f.saved = true;
+  } catch (err) {
+    if (err?.name !== 'AbortError') showError(`無法儲存影片：${err.message}`);
+  }
+  renderSave();
+}
+
+function openCamera() {
+  if (state.busy || !state.session) return;
+  openRecorder($('recorder'), {
+    onDone: (file) => { file.recorded = true; onFileSelected(file); },
+    onCancel: () => {},
+    onPickFile: () => $('video-input').click(),
+  });
 }
 
 function renderSheet() {
@@ -371,7 +419,7 @@ async function onFileSelected(file) {
   state.busy = true;
   state.tab = 'train';
   state.batch = null;
-  state.video = { meta: null, fpsInfo: null, pose: null, recordId: null, poses: {} };
+  state.video = { meta: null, fpsInfo: null, pose: null, recordId: null, poses: {}, file };
   state.videoPanel = true;
   render();
   setStatus({ stage: 'load' });
@@ -650,6 +698,7 @@ function bindEvents() {
     if (file) onFileSelected(file);
   });
   $('next-btn').addEventListener('click', (e) => { if (state.busy) e.preventDefault(); });
+  $('record-btn').addEventListener('click', openCamera);
   $('next-btn').addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && !state.busy) { e.preventDefault(); input.click(); }
   });
@@ -704,6 +753,7 @@ function bindEvents() {
     closeBatch: () => { state.batch = null; render(); window.scrollTo(0, 0); },
     stopAnalysis: () => state.abort?.abort(),
     chooseManual: () => chooseManually(),
+    saveVideo: () => saveVideo(),
     resume: ({ id }) => resumeSession(id),
   };
   delegate($('view-practice'), swingActions);

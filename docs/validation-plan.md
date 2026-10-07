@@ -48,6 +48,14 @@ Protocol and footage requirements: [field-validation.md](field-validation.md).
    generic clip) throws are fast hand motions and will be listed as swings.
    The list makes deleting them one tap away; no classifier is added before
    field data (hard stop).
+8. **In-app recorder in headless Chrome**: with a fake camera fed from
+   IMG_4841.MOV (MJPEG, 540×960) the live framing check turned green on the
+   real person and the overlay lined up with the preview; MediaRecorder
+   produced an MP4 that loads, seeks and analyzes (~0.24 s/frame, lite). The
+   recorded clip itself was almost static (the fake device advanced slowly
+   under load), so no swings were found — a test-harness artifact, not
+   evidence about segmentation. Real camera behavior (orientation, frame
+   rate, MP4 vs WebM, memory for multi-minute recordings) is untested on iPhone.
 
 ## Field log
 

@@ -57,4 +57,6 @@ backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real pr
 - `node tools/check-practice.mjs <outDir> <video> auto` — same, long recording through automatic swing finding.
 - `node tools/evaluate-field.mjs <manifest.csv> <outDir>` — field-validation runner.
 - `node tools/compare-extraction.mjs <video> <start> <end>` — seek vs playback pose extraction (speed, agreement).
+- `node tools/check-recorder.mjs <outDir> [fake.mjpeg] [seconds]` — in-app recorder with Chrome's fake camera;
+  `node tools/make-fake-camera.mjs <video> <start> <end> <out.mjpeg>` turns footage into a fake camera feed.
 - `node tools/plot-analysis.mjs <out.png> <pose.json | '{"synthetic":{...}}'>` — signals/events plot.

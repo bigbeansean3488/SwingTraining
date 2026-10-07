@@ -48,6 +48,7 @@
       </div>
 
       <div id="practice-result"></div>
+      <div id="practice-save"></div>
       <div id="practice-recent"></div>
     </section>
 
@@ -57,10 +58,13 @@
 
   <!-- Primary practice action, always reachable at the bottom -->
   <div class="action-bar" id="action-bar" hidden>
-    <label class="btn btn-primary btn-xl next-btn" id="next-btn" role="button" tabindex="0">
-      <span id="next-btn-text">＋ 加入影片</span>
-      <input id="video-input" type="file" accept="video/*" class="visually-hidden" tabindex="-1" />
-    </label>
+    <div class="action-row">
+      <button type="button" class="btn btn-primary btn-xl rec-btn" id="record-btn" hidden>● 錄影</button>
+      <label class="btn btn-primary btn-xl next-btn" id="next-btn" role="button" tabindex="0">
+        <span id="next-btn-text">＋ 加入影片</span>
+        <input id="video-input" type="file" accept="video/*" class="visually-hidden" tabindex="-1" />
+      </label>
+    </div>
   </div>
 
   <nav class="tabbar" aria-label="主要頁面">
@@ -70,6 +74,7 @@
   </nav>
 
   <div id="sheet" class="sheet" hidden></div>
+  <div id="recorder" class="recorder-host" hidden></div>
   <div id="dialog" class="dialog-host" hidden></div>
 
   <script type="module" src="src/main.js"></script>

@@ -150,11 +150,11 @@ export function renderResult(el, swing, focus, previous, opts) {
       <div class="card empty">
         <p class="empty-title">準備好就開始打</p>
         <ol class="tips">
-          <li>手機固定在腳架，從側面拍到<strong>全身與雙腳</strong></li>
-          <li>開始錄影，連續打 N 球再停止（建議 1080p、60 FPS）</li>
-          <li>按下方「＋ 加入影片」選這段影片，App 會自動找出每一棒</li>
+          <li>手機固定在腳架，從打者正側面拍</li>
+          <li>按下方「● 錄影」，照畫面上的框把打者<strong>全身與雙腳</strong>放進去，框變綠色就可以開始</li>
+          <li>連續打 N 球，按「停止並分析」，App 會自動找出每一棒</li>
         </ol>
-        <p class="muted small">也可以一棒錄一支短片（10 秒內），會直接分析那一棒。</p>
+        <p class="muted small">也可以用「選影片」挑相簿裡的影片（建議 1080p、60 FPS）。10 秒內的短片會直接分析那一棒。</p>
       </div>`;
     return;
   }

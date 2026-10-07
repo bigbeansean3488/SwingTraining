@@ -34,6 +34,8 @@ Until real practice footage is evaluated, every row is `FIELD_VALIDATED: PENDING
 | Pose quality control | YES | YES | PENDING | `tests/quality.test.js` (missing body, low wrist/ankle confidence, jumps, scale jump, partial body, leaving frame, too small) |
 | Swing segmentation in a long recording (find every swing) | YES | YES | PENDING | `tests/segmentation.test.js`: 5-swing synthetic recordings with walking / leaving the frame / hand raise / waggle at 60, 30, 15 fps scans; windows analyzed at full rate recover events; left-handed + mirrored + smaller; nobody tracked → none. **Threshold provisional** (metric-definitions §8) |
 | Playback pose scan (`extractPoseByPlayback`) | YES | partial — used only to locate swings | PENDING | `tools/compare-extraction.mjs`: in headless Chrome (software GL) landmarks lagged seek-based ones by ~0.2–0.3 s, so metrics always use seek-per-frame windows |
+| Framing check for the in-app recorder (whole body / size / left-right room) | YES | YES | PENDING | `tests/framing.test.js`; limits mirror pose QC with margin (src/pose/framing.js) — guidance, not validated |
+| In-app recorder (camera preview + guide + MediaRecorder → analysis, save via share sheet) | YES | YES (headless Chrome fake camera, `tools/check-recorder.mjs`) | PENDING — iPhone Safari camera, orientation, MediaRecorder format and long-recording memory untested | |
 | Recording workflow UI (scan → per-swing analysis → list with replay + one-tap labels, stop keeps finished swings) | YES | YES (headless Chrome, synthetic recording in `tools/check-practice.mjs`) | PENDING — iPhone speed and real recordings untested | docs/ux.md |
 
 ## Test footage available so far

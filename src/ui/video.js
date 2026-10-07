@@ -34,9 +34,12 @@ export function loadVideoFile(video, file, { timeoutMs = 15000 } = {}) {
       video.load();
       reject(new Error(msg));
     };
-    const onLoaded = () => {
+    const onLoaded = async () => {
       cleanup();
       if (!video.videoWidth || !video.videoHeight) return fail('檔案裡沒有可播放的影像。');
+      // Browser-recorded WebM has no duration in its header (Infinity) until
+      // the end has been seen once.
+      if (video.duration === Infinity) await resolveDuration(video);
       if (!Number.isFinite(video.duration) || video.duration <= 0) return fail('無法取得影片長度。');
       resolve({
         name: file.name,
@@ -56,6 +59,21 @@ export function loadVideoFile(video, file, { timeoutMs = 15000 } = {}) {
     video.preload = 'auto';
     video.src = currentUrl;
     video.load();
+  });
+}
+
+function resolveDuration(video) {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      video.removeEventListener('durationchange', onChange);
+      video.currentTime = 0;
+      resolve();
+    };
+    const onChange = () => { if (Number.isFinite(video.duration)) done(); };
+    const timer = setTimeout(done, 5000);
+    video.addEventListener('durationchange', onChange);
+    video.currentTime = 1e9;
   });
 }
 
@@ -89,11 +107,17 @@ export async function probeFrameRate(video, { maxMs = 1500, maxFrames = 40 } = {
 }
 
 /** Seek and wait until the frame at `t` is ready to be drawn. */
-export function seekTo(video, t) {
-  return new Promise((resolve) => {
+export function seekTo(video, t, { timeoutMs = 8000 } = {}) {
+  return new Promise((resolve, reject) => {
     const target = Math.min(Math.max(t, 0), video.duration);
     if (Math.abs(video.currentTime - target) < 1e-4 && video.readyState >= 2) return resolve();
+    // Never hang: a file the browser cannot seek in fails visibly.
+    const timer = setTimeout(() => {
+      video.removeEventListener('seeked', onSeeked);
+      reject(new Error(`影片無法跳到 ${target.toFixed(2)} 秒（這個影片格式可能不支援逐格分析）。`));
+    }, timeoutMs);
     const onSeeked = () => {
+      clearTimeout(timer);
       video.removeEventListener('seeked', onSeeked);
       // Safari can fire 'seeked' before the new frame is decoded; wait one
       // video frame callback when available.

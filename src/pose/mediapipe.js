@@ -93,6 +93,17 @@ export async function extractPoseSequence(video, { variant = 'full', start = 0, 
 }
 
 /**
+ * Detect the pose in the frame currently shown by `video` (e.g. a live
+ * camera preview). Returns the compact landmark array or null.
+ */
+export async function detectCurrentFrame(video, variant = 'lite') {
+  const { landmarker } = await getPoseLandmarker(variant);
+  const ts = Math.max(tsBase, Math.round(performance.now()));
+  tsBase = ts + 1;
+  return fromMediaPipe(landmarker.detectForVideo(video, ts));
+}
+
+/**
  * Run pose detection while the video plays (muted), on frames delivered by
  * requestVideoFrameCallback. Much faster than seeking frame by frame on long
  * or high-resolution clips. Frames are taken at most every 1/targetFps s of

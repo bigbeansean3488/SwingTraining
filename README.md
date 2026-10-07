@@ -55,8 +55,9 @@ docs/                 architecture, metric definitions, validation status/plan, 
 
 ## Using it
 
-訓練 → 選球員、右打/左打、今天想看什麼 → 開始訓練 → 腳架架好、開始錄影、連續打 N 球 →
-＋ 加入影片 → App 自動找出每一棒並逐棒分析 → 在列表回看每一棒、標記擊球感覺。
+訓練 → 選球員、右打/左打、今天想看什麼 → 開始訓練 → 腳架架好 → ● 錄影（畫面上的框引導站位，
+框變綠就 OK）→ 連續打 N 球 → 停止並分析 → App 自動找出每一棒並逐棒分析 → 在列表回看每一棒、
+標記擊球感覺。App 內錄的影片不會進相簿，要留就按「儲存這段影片」。也可以用「選影片」挑相簿的影片。
 也可以一棒一支短片（≤ 10 秒，直接分析那一棒）。紀錄 tab 看整個 Session。Developer Tools
 （合成揮棒、合成長影片、Pose model、診斷）在 設定 裡，或網址加 `?debug=1`。See [docs/ux.md](docs/ux.md).
 

@@ -14,6 +14,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const { page, logs, close } = await openApp();
 try {
   await startSession(page);
+  await page.evaluate(() => { window.__app.multiSwing = false; }); // analyze exactly [start, end]
   const input = await page.$('#video-input');
   await input.uploadFile(videoPath);
   await page.waitForFunction(() => window.__swingDebug?.meta || window.__swingDebug?.error, { timeout: 60000 });

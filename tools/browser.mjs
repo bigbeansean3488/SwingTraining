@@ -12,7 +12,12 @@ const CANDIDATES = [
   '/usr/bin/chromium',
 ].filter(Boolean);
 
-export async function openApp({ headless = true } = {}) {
+/**
+ * @param {{ headless?: boolean, fakeCamera?: string }} opts
+ *   fakeCamera: path of a .mjpeg/.y4m file served as the camera (Chrome fake
+ *   capture device); without it Chrome's fake camera shows a test pattern.
+ */
+export async function openApp({ headless = true, fakeCamera } = {}) {
   const executablePath = CANDIDATES.find((p) => fs.existsSync(p));
   if (!executablePath) throw new Error('No Chrome/Edge found; set CHROME_PATH');
   const server = await startServer(0);
@@ -21,7 +26,11 @@ export async function openApp({ headless = true } = {}) {
     executablePath,
     headless,
     protocolTimeout: 30 * 60000, // pose extraction can keep the page busy for minutes
-    args: ['--autoplay-policy=no-user-gesture-required', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+    args: [
+      '--autoplay-policy=no-user-gesture-required', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+      '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+      ...(fakeCamera ? [`--use-file-for-fake-video-capture=${fakeCamera}`] : []),
+    ],
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 430, height: 932, deviceScaleFactor: 1 });

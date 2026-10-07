@@ -28,8 +28,18 @@ English. Usability with real players during practice is **not yet validated**.
     ├── newest result  Swing #N · QC badge · 今日重點 (focus, large) · trend vs 最近 5 棒
     │                  · 3 secondary metrics · 這一棒擊球感覺？ [扎實][普通][沒打好]
     ├── 最近 5 棒      focus score bars + contact, tap → swing detail
-    └── [＋ 加入影片]   fixed at the bottom; opens camera/library; recordings > 10 s → every swing
-                       found automatically; clips ≤ 10 s → that one swing
+    ├── 儲存這段影片   after an in-app recording (it is not in the photo library): share sheet / download
+    └── [● 錄影] [選影片]  fixed at the bottom. ● 錄影 (primary, red) opens the in-app recorder;
+                       選影片 opens camera/library. Without camera support (http, no MediaRecorder)
+                       only [＋ 加入影片]. Recordings > 10 s → every swing found automatically;
+                       clips ≤ 10 s → that one swing
+錄影 (full screen, in-app recorder)
+    ├── live rear-camera preview, area outside the guide box dimmed, dashed foot line
+    ├── guide box: amber dashed = not ready, green solid = 位置 OK (live Pose check, lite, ~3/s)
+    ├── checklist (icon + text): 全身在畫面內 / 大小適中 / 左右位置 (each with a concrete fix,
+    │   e.g. 「人太小：手機靠近一點」「看不到雙腳：鏡頭拉遠或往下」)
+    ├── [取消] [● 開始錄影] → timer · [■ 停止並分析] → recording workflow
+    └── recording is allowed even when the check is not green (guidance, not a gate)
 紀錄 (tab) — Review
     ├── 今日 Session   Swings · focus trend (first → last) · Good Contact · Best Consistency
     ├── insights       largest variation source; descriptive contact split (≥ 6 labeled, no causal claim)

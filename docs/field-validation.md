@@ -29,6 +29,7 @@ coaching AI, backend) until this evaluation has been run.**
 | Distance | Whole body incl. feet, hands at the top of the follow-through, and the stride fully inside the frame with margin. Start ~5–7 m; note the actual distance |
 | Orientation | Landscape preferred (more room for the stride); note it |
 | Format | 1080p at 60 fps if available (Settings → Camera → Record Video); also note if 4K/30 or slo-mo 120/240 was used |
+| Recording app | Either the in-app recorder (● 錄影; guide box + live framing check; **press 儲存這段影片 afterwards** — in-app recordings are not in the photo library) or the iPhone Camera app. Note which one |
 | Clip length | **One recording per set of swings** (e.g. 10 swings, ≥ 4 s apart; the app finds every swing). Start ≥ 2 s before the first swing. Also record a few **single-swing clips** (≤ 10 s, start ≥ 1 s before the swing) to compare both paths |
 | Background | Avoid other people walking behind the batter |
 
