@@ -17,6 +17,10 @@ import { TeamPage } from './features/team/TeamPage';
 import { JoinPage } from './features/team/JoinPage';
 import { CalendarPage } from './features/team/CalendarPage';
 import { EventForm, EventPage } from './features/team/EventPage';
+import { GamesHome } from './features/games/GamesHome';
+import { GameSetupPage } from './features/games/GameSetupPage';
+import { GameScorePage } from './features/games/GameScorePage';
+import { GameStatsPage, SeasonStatsPage } from './features/games/StatsPages';
 import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
@@ -79,6 +83,16 @@ function trainingRoute(route: Route): ReactNode {
   return <TrainingHome />;
 }
 
+function gamesRoute(route: Route): ReactNode {
+  const [, id, sub] = route.path;
+  if (!id) return <GamesHome />;
+  if (id === 'new') return <GameSetupPage key="new" eventId={route.query.get('event')} />;
+  if (id === 'stats') return <SeasonStatsPage />;
+  if (sub === 'stats') return <GameStatsPage key={id} id={id} />;
+  if (sub === 'setup') return <GameSetupPage key={id} id={id} />;
+  return <GameScorePage key={id} id={id} />;
+}
+
 function moreRoute(route: Route): ReactNode {
   const [, sub, id] = route.path;
   switch (sub) {
@@ -109,7 +123,7 @@ function renderRoute(route: Route): ReactNode {
     case 'training':
       return trainingRoute(route);
     case 'games':
-      return <NotYet title="比賽" />;
+      return gamesRoute(route);
     case 'more':
       return moreRoute(route);
     case 'join':

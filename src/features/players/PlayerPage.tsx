@@ -19,8 +19,10 @@ import {
 import { LineChart } from '../../ui/LineChart';
 import { formatMetric, KIND_LABEL, METRIC_INFO, METRIC_ORDER } from '../analyze/metricInfo';
 import { LOG_KIND_LABEL, logSummary } from '../training/trainingInfo';
+import { useTeamReplays } from '../games/gameData';
+import { BattingTable, PitchingTable } from '../games/StatsTables';
 
-type Tab = 'profile' | 'analyses' | 'trend' | 'training';
+type Tab = 'profile' | 'analyses' | 'trend' | 'training' | 'games';
 
 export function PlayerPage({ id }: { id: string }) {
   const p = useRow('profiles', id);
@@ -47,6 +49,7 @@ export function PlayerPage({ id }: { id: string }) {
           { value: 'trend', label: '趨勢' },
           { value: 'analyses', label: '分析紀錄' },
           { value: 'training', label: '訓練' },
+          { value: 'games', label: '比賽' },
           { value: 'profile', label: '基本資料' },
         ]}
       />
@@ -54,6 +57,7 @@ export function PlayerPage({ id }: { id: string }) {
       {tab === 'analyses' ? <AnalysisList playerId={p.id} /> : null}
       {tab === 'trend' ? <Trends playerId={p.id} /> : null}
       {tab === 'training' ? <TrainingList playerId={p.id} /> : null}
+      {tab === 'games' ? <GameLines playerId={p.id} /> : null}
     </Page>
   );
 }
@@ -235,6 +239,24 @@ function TrainingList({ playerId }: { playerId: string }) {
           subtitle={logSummary(l)}
         />
       ))}
+    </div>
+  );
+}
+
+function GameLines({ playerId }: { playerId: string }) {
+  const access = useAccess();
+  const replays = useTeamReplays(access.teamId);
+  const profiles = useRows('profiles');
+  if (!replays) return <Empty>載入中…</Empty>;
+  const games = replays.map((r) => r.result);
+  return (
+    <div className="stack">
+      <Card title="打擊">
+        <BattingTable games={games} profiles={profiles} onlyPlayer={playerId} />
+      </Card>
+      <Card title="投球">
+        <PitchingTable games={games} profiles={profiles} onlyPlayer={playerId} />
+      </Card>
     </div>
   );
 }
