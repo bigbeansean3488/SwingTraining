@@ -13,6 +13,10 @@ import { TrainingHome } from './features/training/TrainingHome';
 import { LogForm } from './features/training/LogForm';
 import { SessionPage } from './features/training/SessionPage';
 import type { TrainingLogKind } from './lib/types';
+import { TeamPage } from './features/team/TeamPage';
+import { JoinPage } from './features/team/JoinPage';
+import { CalendarPage } from './features/team/CalendarPage';
+import { EventForm, EventPage } from './features/team/EventPage';
 import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
@@ -86,6 +90,11 @@ function moreRoute(route: Route): ReactNode {
       return <SettingsPage />;
     case 'players':
       return id ? <PlayerPage key={id} id={id} /> : <PlayersPage />;
+    case 'team':
+      return <TeamPage />;
+    case 'calendar':
+      if (id === 'new') return <EventForm />;
+      return id ? <EventPage key={id} id={id} /> : <CalendarPage />;
     default:
       return <NotYet title="更多" />;
   }
@@ -103,6 +112,8 @@ function renderRoute(route: Route): ReactNode {
       return <NotYet title="比賽" />;
     case 'more':
       return moreRoute(route);
+    case 'join':
+      return <JoinPage token={route.path[1] ?? ''} />;
     default:
       return <NotYet title="找不到頁面" />;
   }
