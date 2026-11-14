@@ -1,62 +1,45 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repo.
+給 Claude Code 的常駐規則。完整依據是 `docs/PROJECT_BRIEF.md`；每次開始工作前先讀它和 `docs/PROGRESS.md`。
 
-## Communication
-- Discuss with the user in Traditional Chinese (繁體中文). Code, comments, commits, and docs in English.
-- User-facing UI text: Traditional Chinese (Taiwan) with established baseball/technical terms in English
-  (Session, Swing, Stride, Hand Path, Baseline, Tracking, Good/Medium/Poor …). See docs/ux.md.
-- Practice workflow: record one video, hit N balls, then analyze — long recordings are segmented into
-  swings automatically (docs/metric-definitions.md §8); single-swing clips still work.
-- UI is practice-first (Setup → Practice → Review). Developer controls (synthetic swings, Pose model,
-  environment, diagnostics) live only in 設定 → Developer Tools (or `?debug=1`).
+## 溝通與語言
+- 與使用者討論用繁體中文（台灣用語）。
+- 介面文字、文件、提交訊息的說明用繁體中文；程式碼識別字與註解用英文。
+- 介面以手機直向為主，按鈕要夠大（≥ 48px），戶外強光下可讀（高對比）。
 
-## Project constraints (V0)
-- Static, local-first web app for iPhone Safari. No backend, no auth, no cloud DB, no LLM, no paid services.
-- No bundler: native ES modules, deployable to GitHub Pages as-is. MediaPipe Tasks Vision loaded from CDN.
-- Dev server: `python -m http.server 8000` (or `node tools/serve.mjs 8000`).
-- Storage: IndexedDB for structured data. Don't keep full videos by default.
+## 不可違反的限制（摘自任務書 §2）
+- **零費用**：只用免費方案。任何要付費、綁信用卡、買網域的做法，先停下來問使用者。
+- 一支手機就能用：iOS Safari 與 Android Chrome；不需額外硬體、電腦或原生 App。
+- 沒網路時核心功能（骨架分析、記錄輸入）仍可運作，恢復連線後同步。
+- 不使用學校／研究室伺服器或 NAS。
+- 不做逆向工程：不拆解、不抓取、不模仿 GameChanger、SwingX 等商用產品的程式、API、介面與評分公式。只參考公開記錄規則與生物力學文獻。
+- 不做：比賽直播、影片精華剪輯、對外公開的球員頁面、金流。
+- 不做：棒速、擊球仰角、擊球初速、球速、轉速、甜蜜點。
+- 回饋文字只跟球員自己的歷史比較（變大／變小／變穩定），不做好壞評分、不做傷害風險或醫療判斷。
 
-## Architecture rules
-- Layers stay separate: video → pose landmarks → signal processing → measurements → comparison → interpretation.
-- `src/analysis/` is pure (no DOM, no imports from `src/ui/`) and must be unit-tested.
-- Every metric returns `{ value, confidence, diagnostics }`.
-- No physical units (cm, m/s, true 3D degrees) without calibration — use normalized body units and frame/relative timing.
-- Fail visibly: poor tracking → "Unable to reliably analyze this swing." QC-failed swings never enter the baseline.
-- No coaching claims without an explicitly validated rule.
-- When a formula changes, update `docs/metric-definitions.md`.
+## 架構（摘自任務書 §3）
+- Vite + React + TypeScript PWA，代管在 Cloudflare Pages（`*.pages.dev`）。
+- 骨架分析：`@mediapipe/tasks-vision` Pose Landmarker，全部在瀏覽器內運算，影片不上傳。
+- 後端：Supabase 免費方案（Auth、Postgres、RLS）。本機：IndexedDB（離線暫存、同步佇列、選擇性保留影片）。
+- 資料流：選取影片 → 逐幀推論 → 指標 → 只同步壓縮關鍵點、指標、少量關鍵幀截圖。
+- `src/analysis/` 是純函式：不可 import React、DOM 相關模組、Supabase、`src/ui`、`src/features`、`src/lib`、`src/pose`（ESLint 會擋）。
+- 比賽資料是事件紀錄：每球／每打席一筆事件，統計值即時由事件計算，不儲存統計值。
+- 所有資料列帶 `player_id`（＝`profiles.id`）與時間戳。
+- 資料庫結構只用 `supabase/migrations/*.sql` 管理。
+- 每筆動作分析記錄模型版本與分析引擎版本（`ENGINE_VERSION`）。
+- 長度用軀幹長正規化，不顯示像素或公分；速度與角度前先濾波（參數寫在 `docs/METRICS.md`）。
 
-## Workflow
-- Work milestone by milestone (see below). Don't ask for confirmation on routine steps.
-- One coherent commit per milestone or meaningful unit; descriptive messages.
-- Don't tune metrics to make the demo look good. Record failures in `docs/validation-plan.md`.
+## 工作規則（摘自任務書 §9）
+- 每個階段：開分支、小步提交、通過 lint／型別檢查／測試／建置、開 PR、更新 `docs/PROGRESS.md`。
+- 金鑰與密碼只放環境變數與 GitHub Secrets，絕不寫進程式碼或提交紀錄。
+- 分析引擎每個指標都要有單元測試（`tests/fixtures/` 的關鍵點資料）。
+- 不提交真人影片或可辨識個人的資料。
+- 進度文件明確區分「已寫完」「已通過自動測試」「已在實機確認」；沒實機驗證過不可標示完成。
+- 與任務書衝突或沒寫到的重大決定，先問使用者。決定與理由寫進 `docs/DECISIONS.md`。
+- 指標公式改變時更新 `docs/METRICS.md`，並調高 `ENGINE_VERSION`。
 
-## Milestones
-0. Bootstrap ✅
-1. Video input ✅
-2. Pose estimation ✅
-3. Pose quality control ✅
-4. Normalization ✅
-5. Individual metrics ✅
-6. Multi-swing comparison ✅
-7. Composite motion consistency score ✅ (scale provisional)
-8. Contact quality label ✅
-9. Practice UX loop ✅
-10. Real iPhone validation — **blocked on field footage**. Follow docs/field-validation.md.
-
-## Hard stop
-Until field footage has been evaluated (docs/field-validation.md F1–F6, F10), do NOT add:
-bat detection, ball tracking, impact audio, automatic contact prediction, coaching AI,
-backend, cloud DB, accounts. Never mark anything FIELD_VALIDATED without real practice footage.
-
-## Dev commands
-- Node is at `C:/Program Files/nodejs` (in Git Bash: `export PATH="/c/Program Files/nodejs:$PATH"`).
-- `npm test` — unit tests (node:test, synthetic fixtures).
-- `node tools/check-practice.mjs <outDir> [video start end]` — end-to-end practice loop in headless Chrome.
-- `node tools/check-pose.mjs <video> <start> <end> [model] [outDir]` — pose + overlay screenshots.
-- `node tools/check-practice.mjs <outDir> <video> auto` — same, long recording through automatic swing finding.
-- `node tools/evaluate-field.mjs <manifest.csv> <outDir>` — field-validation runner.
-- `node tools/compare-extraction.mjs <video> <start> <end>` — seek vs playback pose extraction (speed, agreement).
-- `node tools/check-recorder.mjs <outDir> [fake.mjpeg] [seconds]` — in-app recorder with Chrome's fake camera;
-  `node tools/make-fake-camera.mjs <video> <start> <end> <out.mjpeg>` turns footage into a fake camera feed.
-- `node tools/plot-analysis.mjs <out.png> <pose.json | '{"synthetic":{...}}'>` — signals/events plot.
+## 開發指令
+- Node 在 `C:/Program Files/nodejs`（Git Bash：`export PATH="/c/Program Files/nodejs:$PATH"`）。
+- `npm run dev`：開發伺服器。`npm run check`：lint + 型別 + 測試 + 建置（CI 同步）。
+- `npm test`、`npm run typecheck`、`npm run lint`、`npm run format`。
+- `node scripts/make-fixtures.mjs`：重新產生 `tests/fixtures/` 的合成關鍵點。
