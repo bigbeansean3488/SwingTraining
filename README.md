@@ -8,6 +8,22 @@
 
 專案依據見 [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md)，進度見 [`docs/PROGRESS.md`](docs/PROGRESS.md)。
 
+## 功能
+
+| 頁面 | 內容 |
+|---|---|
+| 分析 | 選取側面機位影片 → 逐幀骨架推論 → 疊圖播放（逐幀、慢速）→ 打擊／投球分期與指標、關鍵幀、跟自己歷史比較、並排比較、匯出 JSON；拍攝引導、診斷頁 |
+| 訓練 | 課表（全隊／個人）、打擊數、牛棚球種與球數、體能測驗、自訂項目 |
+| 比賽 | 簡化（逐打席）或逐球記錄、跑壘、換人、可修改刪除；打擊／投球／守備數據、落點圖、用球數 |
+| 更多 | 帳號與同步、球隊（名單、角色、球季、邀請連結）、行事曆與出席、球員檔案與趨勢、報表（時間軸、教練總覽、CSV）、設定與用量 |
+
+## 文件
+
+- [`docs/METRICS.md`](docs/METRICS.md)：每個動作指標的定義、公式、濾波參數、限制與參考文獻
+- [`docs/DECISIONS.md`](docs/DECISIONS.md)：技術決定與理由、技術風險驗證狀態
+- [`docs/SCORING_SCOPE.md`](docs/SCORING_SCOPE.md)：比賽記錄支援範圍（待確認）
+- [`docs/SETUP_SUPABASE.md`](docs/SETUP_SUPABASE.md)：Supabase、Google 登入、保活與備份設定步驟
+
 ## 本機開發
 
 需要 Node.js 22 以上。
@@ -52,6 +68,7 @@ npm run check      # lint + 型別檢查 + 測試 + 建置（與 CI 相同）
 
 ```
 src/analysis/   純函式分析引擎（含單元測試）
+src/scoring/    純函式比賽計分引擎（含單元測試）
 src/pose/       MediaPipe 包裝、影片逐幀擷取
 src/features/   各功能頁面
 src/lib/        本機資料庫、同步、Supabase client、共用工具
