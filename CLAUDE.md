@@ -23,7 +23,7 @@
 - 後端：Supabase 免費方案（Auth、Postgres、RLS）。本機：IndexedDB（離線暫存、同步佇列、選擇性保留影片）。
 - 資料流：選取影片 → 逐幀推論 → 指標 → 只同步壓縮關鍵點、指標、少量關鍵幀截圖。
 - `src/analysis/` 是純函式：不可 import React、DOM 相關模組、Supabase、`src/ui`、`src/features`、`src/lib`、`src/pose`（ESLint 會擋）。
-- 比賽資料是事件紀錄：每球／每打席一筆事件，統計值即時由事件計算，不儲存統計值。
+- 比賽資料是事件紀錄：每球／每打席一筆事件，統計值即時由事件計算，不儲存統計值。計分引擎在 `src/scoring/`（純函式，同樣不可 import UI／DOM／Supabase）。支援範圍見 `docs/SCORING_SCOPE.md`。
 - 所有資料列帶 `player_id`（＝`profiles.id`）與時間戳。
 - 資料庫結構只用 `supabase/migrations/*.sql` 管理。
 - 每筆動作分析記錄模型版本與分析引擎版本（`ENGINE_VERSION`）。
