@@ -8,6 +8,11 @@ import { AccountPage } from './features/more/AccountPage';
 import { SettingsPage } from './features/more/SettingsPage';
 import { PlayersPage } from './features/players/PlayersPage';
 import { PlayerPage } from './features/players/PlayerPage';
+import { ComparePage } from './features/analyze/ComparePage';
+import { TrainingHome } from './features/training/TrainingHome';
+import { LogForm } from './features/training/LogForm';
+import { SessionPage } from './features/training/SessionPage';
+import type { TrainingLogKind } from './lib/types';
 import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
@@ -51,9 +56,23 @@ function analyzeRoute(route: Route): ReactNode {
       return <ShootingGuide />;
     case 'diagnostics':
       return <Diagnostics />;
+    case 'compare':
+      return <ComparePage a={route.query.get('a')} b={route.query.get('b')} />;
     default:
       return <ResultPage key={sub} id={sub} />;
   }
+}
+
+function trainingRoute(route: Route): ReactNode {
+  const [, sub, id] = route.path;
+  if (sub === 'log') {
+    if (id && id !== 'new') return <LogForm key={id} id={id} />;
+    const kind = (route.query.get('kind') ?? 'batting') as TrainingLogKind;
+    return <LogForm key={kind} initialKind={kind} sessionId={route.query.get('session')} />;
+  }
+  if (sub === 'session')
+    return id && id !== 'new' ? <SessionPage key={id} id={id} /> : <SessionPage key="new" />;
+  return <TrainingHome />;
 }
 
 function moreRoute(route: Route): ReactNode {
@@ -79,7 +98,7 @@ function renderRoute(route: Route): ReactNode {
     case 'analyze':
       return analyzeRoute(route);
     case 'training':
-      return <NotYet title="訓練" />;
+      return trainingRoute(route);
     case 'games':
       return <NotYet title="比賽" />;
     case 'more':

@@ -9,7 +9,7 @@ import { useRow, useRows } from '../../lib/hooks';
 import { navigate } from '../../lib/router';
 import type { MotionAnalysis } from '../../lib/types';
 import { loadVideoElement } from '../../pose/extract';
-import { Badge, Button, Card, Notice, Page } from '../../ui/components';
+import { Badge, Button, Card, LinkButton, Notice, Page } from '../../ui/components';
 import {
   DISCLAIMER,
   EVENT_LABELS,
@@ -236,6 +236,9 @@ export function ResultPage({ id }: { id: string }) {
 
       <Card title="資料">
         <div className="stack">
+          <LinkButton to={`/analyze/compare?a=${row.id}`} variant="secondary">
+            與另一次分析並排比較
+          </LinkButton>
           <Button variant="secondary" onClick={exportJson} disabled={!seq}>
             匯出 JSON
           </Button>
