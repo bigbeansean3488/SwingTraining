@@ -2,6 +2,12 @@ import { useEffect, type ReactNode } from 'react';
 import { href, useRoute, type Route } from './lib/router';
 import { useOnline } from './lib/hooks';
 import { ensureMe } from './lib/identity';
+import { initAuth } from './lib/auth';
+import { MorePage } from './features/more/MorePage';
+import { AccountPage } from './features/more/AccountPage';
+import { SettingsPage } from './features/more/SettingsPage';
+import { PlayersPage } from './features/players/PlayersPage';
+import { PlayerPage } from './features/players/PlayerPage';
 import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
@@ -50,6 +56,22 @@ function analyzeRoute(route: Route): ReactNode {
   }
 }
 
+function moreRoute(route: Route): ReactNode {
+  const [, sub, id] = route.path;
+  switch (sub) {
+    case undefined:
+      return <MorePage />;
+    case 'account':
+      return <AccountPage />;
+    case 'settings':
+      return <SettingsPage />;
+    case 'players':
+      return id ? <PlayerPage key={id} id={id} /> : <PlayersPage />;
+    default:
+      return <NotYet title="更多" />;
+  }
+}
+
 function renderRoute(route: Route): ReactNode {
   switch (route.path[0]) {
     case undefined:
@@ -61,7 +83,7 @@ function renderRoute(route: Route): ReactNode {
     case 'games':
       return <NotYet title="比賽" />;
     case 'more':
-      return <NotYet title="更多" />;
+      return moreRoute(route);
     default:
       return <NotYet title="找不到頁面" />;
   }
@@ -72,7 +94,7 @@ export function App() {
   const online = useOnline();
   const section = route.path[0] ?? '';
   useEffect(() => {
-    ensureMe();
+    ensureMe().then(() => initAuth());
   }, []);
   useEffect(() => {
     window.scrollTo(0, 0);
