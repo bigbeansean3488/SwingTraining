@@ -1,5 +1,6 @@
 // Rule-based feedback: compares a result with the athlete's OWN history.
-// Describes direction (higher / lower / similar) and stability only; never a
+// Describes direction (higher / lower / similar), position within the own
+// range and difference from own "good" references only; never a
 // good/bad judgement, never injury or medical statements.
 import { isNum, mean, std } from './signal';
 import type { Metrics } from './types';
@@ -76,4 +77,86 @@ export function compareWithHistory(current: Metrics, history: Metrics[]): Feedba
 
 function round(v: number) {
   return Math.round(v * 1000) / 1000;
+}
+
+// ---------------------------------------------------------------------------
+// Position within the athlete's own range
+// ---------------------------------------------------------------------------
+
+export type RangePosition = 'below' | 'low' | 'middle' | 'high' | 'above';
+
+export interface RangeReport {
+  min: number;
+  max: number;
+  mean: number;
+  n: number;
+  position: RangePosition;
+}
+
+/**
+ * Where `value` falls among the athlete's own earlier values: outside the range
+ * (below / above) or in the lower, middle or upper third of it.
+ * Needs at least MIN_HISTORY earlier values.
+ */
+export function positionInRange(value: number, past: number[]): RangeReport | null {
+  const xs = past.filter(isNum);
+  if (xs.length < MIN_HISTORY || !isNum(value)) return null;
+  const min = Math.min(...xs);
+  const max = Math.max(...xs);
+  const span = max - min;
+  let position: RangePosition;
+  if (value < min) position = 'below';
+  else if (value > max) position = 'above';
+  else if (span === 0) position = 'middle';
+  else {
+    const f = (value - min) / span;
+    position = f < 1 / 3 ? 'low' : f > 2 / 3 ? 'high' : 'middle';
+  }
+  return { min: round(min), max: round(max), mean: round(mean(xs)), n: xs.length, position };
+}
+
+// ---------------------------------------------------------------------------
+// Comparison with the athlete's own analyses marked as "good"
+// ---------------------------------------------------------------------------
+
+export interface ReferenceDiff {
+  key: string;
+  trend: Trend;
+  value: number;
+  refMean: number;
+  /** Number of references that have this metric. */
+  n: number;
+  /** |difference| divided by the "similar" threshold; used only for ordering. */
+  size: number;
+}
+
+export interface ReferenceReport {
+  count: number;
+  metrics: ReferenceDiff[];
+}
+
+/**
+ * Compare a result with the athlete's own analyses that they (or their coach)
+ * marked as good. The threshold for "similar" is the larger of the spread among
+ * the references and the per-unit minimum change. Works from one reference.
+ */
+export function compareWithReference(current: Metrics, refs: Metrics[]): ReferenceReport {
+  const out: ReferenceReport = { count: refs.length, metrics: [] };
+  for (const [key, m] of Object.entries(current)) {
+    const vals = refs.map((r) => r[key]?.value).filter(isNum);
+    if (!vals.length) continue;
+    const mu = mean(vals);
+    const sd = vals.length > 1 ? std(vals) : NaN;
+    const thr = Math.max(isNum(sd) ? sd : 0, MIN_DELTA[m.unit] ?? 0) || 1e-9;
+    const diff = m.value - mu;
+    out.metrics.push({
+      key,
+      trend: Math.abs(diff) <= thr ? 'similar' : diff > 0 ? 'higher' : 'lower',
+      value: m.value,
+      refMean: round(mu),
+      n: vals.length,
+      size: Math.abs(diff) / thr,
+    });
+  }
+  return out;
 }
