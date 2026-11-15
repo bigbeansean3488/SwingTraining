@@ -1,68 +1,62 @@
-# SwingTraining
+# 球隊訓練：棒球隊管理與訓練分析平台
 
-Lightweight baseball swing consistency demo that runs in iPhone Safari.
-Single side-view video → automatic pose (MediaPipe) → normalized trajectories →
-within-player consistency metrics. Local-first: no backend, no accounts, no paid services.
+給一支成棒球隊隊內使用的網頁 App（PWA）：球隊管理、訓練紀錄、手機影片骨架分析、比賽記錄，並把訓練與比賽放在同一條時間軸上對照。
 
-V0 validation question: *Can a single iPhone camera, under realistic evening
-practice lighting, reliably detect meaningful differences between repeated
-swings from the same player?*
+- 只用免費服務：Cloudflare Pages（代管）、Supabase 免費方案（登入與資料庫）、GitHub Actions（CI、保活、備份）。
+- 影片在手機瀏覽器內分析，**不會上傳**。只同步骨架座標、指標與少量關鍵幀截圖。
+- 沒網路也能分析與記錄，恢復連線後自動同步。
 
-## Run locally
+專案依據見 [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md)，進度見 [`docs/PROGRESS.md`](docs/PROGRESS.md)。
 
-No build step. The app is plain ES modules served as static files.
+## 本機開發
 
-```sh
-python -m http.server 8000
-# open http://localhost:8000
+需要 Node.js 22 以上。
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm run check      # lint + 型別檢查 + 測試 + 建置（與 CI 相同）
 ```
 
-To test on an iPhone on the same Wi-Fi, open `http://<your-PC-LAN-IP>:8000`
-in Safari (Windows Firewall may need to allow Python on private networks).
+`npm install` 會把 MediaPipe 的 wasm 執行檔複製到 `public/mediapipe/`（不進版本控制）。
 
-## Tests
+## 部署到 Cloudflare Pages（需要你本人操作）
 
-```sh
-npm install          # dev tools only (puppeteer-core, fake-indexeddb)
-npm test             # unit tests on synthetic swings (no footage needed)
-node tools/check-practice.mjs out/   # end-to-end practice loop in headless Chrome
+只需做一次。之後每次合併到 `main` 會自動部署。
+
+1. 到 <https://dash.cloudflare.com/sign-up> 用 Email 註冊免費帳號（**不需要信用卡**；如果任何畫面要求付款資訊，停下來不要填）。
+2. 登入後，左側選單點 **Workers & Pages** → **Create application**。
+   畫面預設可能是 Workers；請切到 **Pages** 分頁（或點「Looking to deploy Pages? Get started」），選 **Import an existing Git repository**。
+3. 點 **Connect GitHub**，授權 Cloudflare 存取 GitHub，可以只授權 `SwingTraining` 這一個儲存庫。
+4. 選擇儲存庫 `SwingTraining` → **Begin setup**，填寫：
+   - **Project name**：例如 `ncku-baseball`（網址會是 `https://ncku-baseball.pages.dev`，名稱一旦建立就不能改）
+   - **Production branch**：`main`
+   - **Framework preset**：`None`
+   - **Build command**：`npm run build`
+   - **Build output directory**：`dist`
+   - **Environment variables**：階段 0 先不用填。階段 2 會加 `VITE_SUPABASE_URL` 與 `VITE_SUPABASE_PUBLISHABLE_KEY`（見下方）。
+5. 點 **Save and Deploy**，等第一次建置完成（約 1～2 分鐘）。
+6. **節省建置次數**（免費方案每月 500 次）：進入專案 → **Settings** → **Builds** →
+   **Branch control** → 把 **Preview branch** 改成 **None**（只有 `main` 會部署）→ 儲存。
+7. 用手機打開 `https://<project-name>.pages.dev`：
+   - iPhone Safari：分享按鈕 → **加入主畫面**。
+   - Android Chrome：右上選單 → **安裝應用程式**（或「加到主畫面」）。
+
+**做完請回報**：部署後的網址，以及手機能否開啟首頁、能否加入主畫面。
+
+## 設定 Supabase（階段 2，需要你本人操作）
+
+見 [`docs/SETUP_SUPABASE.md`](docs/SETUP_SUPABASE.md)。沒設定 Supabase 時，App 以「本機模式」運作：所有功能都能用，資料只存在這支手機。
+
+## 目錄
+
 ```
-
-Analysis modules (`src/analysis`, `src/pose/quality.js`) are pure functions;
-`src/synthetic/` generates stick-figure swings with exactly known events for
-tests and for the in-app demo buttons.
-
-## Deploy
-
-GitHub Pages: Settings → Pages → Deploy from branch → `main` / root.
-No build is required.
-
-## Layout
-
+src/analysis/   純函式分析引擎（含單元測試）
+src/pose/       MediaPipe 包裝、影片逐幀擷取
+src/features/   各功能頁面
+src/lib/        本機資料庫、同步、Supabase client、共用工具
+src/ui/         共用元件與樣式
+supabase/       SQL migration
+tests/fixtures/ 合成的關鍵點測試資料（不含真人影片）
+docs/           任務書、進度、指標定義、技術決定
 ```
-index.html            entry page
-src/main.js           wiring only
-src/app/              session records, plain-language interpretation
-src/pose/             MediaPipe wrapper, landmark model, quality control
-src/analysis/         normalization, events, metrics, comparison, consistency (pure)
-src/synthetic/        synthetic swings/sessions (tests + demo)
-src/storage/          IndexedDB
-src/ui/               video, skeleton overlay, results, session views
-tests/                unit tests
-tools/                browser checks, plots, field-validation runner
-docs/                 architecture, metric definitions, validation status/plan, field validation
-```
-
-## Using it
-
-訓練 → 選球員、右打/左打、今天想看什麼 → 開始訓練 → 腳架架好、開始錄影、連續打 N 球 →
-＋ 加入影片 → App 自動找出每一棒並逐棒分析 → 在列表回看每一棒、標記擊球感覺。
-也可以一棒一支短片（≤ 10 秒，直接分析那一棒）。紀錄 tab 看整個 Session。Developer Tools
-（合成揮棒、合成長影片、Pose model、診斷）在 設定 裡，或網址加 `?debug=1`。See [docs/ux.md](docs/ux.md).
-
-## Status
-
-V0 pipeline complete through Milestone 9 and unit-validated on synthetic data.
-**Field validation is pending** — no real practice footage has been evaluated.
-See [docs/validation-status.md](docs/validation-status.md) and
-[docs/field-validation.md](docs/field-validation.md).
