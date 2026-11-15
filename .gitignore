@@ -19,3 +19,4 @@ data/
 backups/
 *.dump
 *.sql.gpg
+.claude/
