@@ -121,6 +121,12 @@ MediaPipe Pose Landmarker 每幀 33 個關鍵點（影像正規化座標 x、y �
 - 累積 8 筆以上時，比較最近 5 筆與更早資料的標準差：比值 < 0.7 →「最近 5 次變穩定」，> 1.4 →「波動變大」。
 - **不做**好壞評分、不給傷害風險或醫療相關判斷。
 
+### 4.1 結果頁的呈現（2026-11-15 起，不影響指標數值）
+- **個人範圍**（`positionInRange`）：拿本次跟同球員之前最多 20 次可比較的分析（至少 3 次）比較：低於最小值 →「比你之前 N 次都小」，高於最大值 →「都大」，否則依落在範圍的下、中、上三分之一說「偏小／中間／偏大」。「大／小」依指標換成白話，例如時間「長／短」、膝角「直／彎」。
+- **與標記為好的動作比較**（`compareWithReference`）：球員或教練可以把某幾次分析標記為「好的動作」（欄位 `motion_analyses.marked_good`）。本次與這些分析的平均比較，門檻 = max(好動作之間的標準差, 最小差值)；只有一次好動作時只用最小差值。結果頁「重點摘要」列出差值 ÷ 門檻最大的 3 項。比較對象是球員自己的動作，不是外部標準。
+- **量測位置圖**（`src/analysis/figures.ts`）：用與指標相同的濾波、前腳判斷與事件影格，算出角度的三個點或位移的起訖點，畫在關鍵幀上（沒有關鍵幀時畫在骨架上）。單元測試確認從圖上量回的數值等於指標（`figures.test.ts`）。
+- **研究怎麼說**：部分指標附公開文獻的一般觀察與出處（`src/features/analyze/literature.ts`），只寫能在原文摘要或主要整理中查到的內容，並註明不是個人建議（見 DECISIONS D19）。
+
 ## 5. 參考文獻
 > 以下為公開發表的生物力學文獻，作為指標選擇與分期定義的依據。引用前請以原文核對細節。
 
@@ -131,3 +137,7 @@ MediaPipe Pose Landmarker 每幀 33 個關鍵點（影像正規化座標 x、y �
 5. Fleisig, G. S., Barrentine, S. W., Zheng, N., Escamilla, R. F., & Andrews, J. R. (1999). Kinematic and kinetic comparison of baseball pitching among various levels of development. *Journal of Biomechanics, 32*(12), 1371–1375.
 6. Stodden, D. F., Fleisig, G. S., McLean, S. P., & Andrews, J. R. (2005). Relationship of biomechanical factors to baseball pitching velocity: Within pitcher variation. *Journal of Applied Biomechanics, 21*(1), 44–56.
 7. Bazarevsky, V., Grishchenko, I., Raveendran, K., Zhu, T., Zhang, F., & Grundmann, M. (2020). BlazePose: On-device real-time body pose tracking. *arXiv:2006.10204*.
+8. Matsuo, T., Escamilla, R. F., Fleisig, G. S., Barrentine, S. W., & Andrews, J. R. (2001). Comparison of kinematic and temporal parameters between different pitch velocity groups. *Journal of Applied Biomechanics, 17*(1), 1–13.（「研究怎麼說」：投球前膝、軀幹前傾）
+9. Fleisig, G. S. (2010). Biomechanics of baseball pitching: Implications for injury and performance. *Proceedings of the XXVIII International Symposium of Biomechanics in Sports*.（「研究怎麼說」：跨步佔身高百分比）
+10. Kishita, Y., Ueda, H., & Kashino, M. (2020). Eye and head movements of elite baseball players in real batting. *Frontiers in Sports and Active Living, 2*, 3.（「研究怎麼說」：頭部）
+11. Kishita, Y., Ueda, H., & Kashino, M. (2020). Temporally coupled coordination of eye and body movements in baseball batting for a wide range of ball speeds. *Frontiers in Sports and Active Living, 2*, 64.（「研究怎麼說」：頭部）

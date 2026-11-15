@@ -21,6 +21,8 @@
 2. 打開儲存庫的 [`supabase/migrations/20261114000000_init.sql`](../supabase/migrations/20261114000000_init.sql)，全選複製，貼進編輯器。
 3. 按 **Run**。應該看到「Success. No rows returned」。
    - 如果出現錯誤，把整段錯誤訊息截圖回報，不要自行修改 SQL。
+4. `supabase/migrations/` 裡**之後新增的檔案**，依檔名順序一個一個照同樣方式執行（新建專案時全部依序執行即可）：
+   - [`20261115000000_marked_good.sql`](../supabase/migrations/20261115000000_marked_good.sql)：「標記為好的動作」欄位。**已經照舊版步驟建好資料表的專案也要補執行這一個**，否則有標記的分析會同步失敗。
 
 ## C. 取得連線資訊
 

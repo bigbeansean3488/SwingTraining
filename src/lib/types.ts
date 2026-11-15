@@ -191,6 +191,8 @@ export interface MotionAnalysis extends BaseRow {
   /** Local only: kept original video. */
   video_blob_key: string | null;
   note: string | null;
+  /** Marked by the athlete or coach as a good motion to compare against. Missing on old rows. */
+  marked_good?: boolean;
   created_by: string | null;
 }
 

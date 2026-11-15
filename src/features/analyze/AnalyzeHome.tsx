@@ -21,6 +21,9 @@ export function AnalyzeHome() {
           並排比較
         </LinkButton>
       </div>
+      <LinkButton to="/analyze/metrics" variant="secondary">
+        指標說明（每個數字代表什麼）
+      </LinkButton>
       <Card title="分析紀錄">
         {analyses === null ? (
           <Empty>載入中…</Empty>
@@ -32,7 +35,7 @@ export function AnalyzeHome() {
               <ListLink
                 key={a.id}
                 to={`/analyze/${a.id}`}
-                title={`${KIND_LABEL[a.kind]}・${name(a.player_id)}`}
+                title={`${a.marked_good ? '★ ' : ''}${KIND_LABEL[a.kind]}・${name(a.player_id)}`}
                 subtitle={`${new Date(a.recorded_at).toLocaleString('zh-TW')}・${a.fps.toFixed(0)} fps`}
                 right={
                   a.quality.ok ? <Badge kind="ok">完成</Badge> : <Badge kind="error">需重拍</Badge>

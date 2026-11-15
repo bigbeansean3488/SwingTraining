@@ -331,6 +331,16 @@ describe('row-level security', () => {
     expect(r!.note).toBe('new');
   });
 
+  it('only the athlete and staff can mark an analysis as good', async () => {
+    await as(U.b, `update motion_analyses set marked_good = true where id = $1`, [id(400)]);
+    const q = `select marked_good from motion_analyses where id = $1`;
+    expect((await as<{ marked_good: boolean }>(U.a, q, [id(400)]))[0]!.marked_good).toBe(false);
+    await as(U.a, `update motion_analyses set marked_good = true where id = $1`, [id(400)]);
+    expect((await as<{ marked_good: boolean }>(U.a, q, [id(400)]))[0]!.marked_good).toBe(true);
+    await as(U.coach, `update motion_analyses set marked_good = false where id = $1`, [id(400)]);
+    expect((await as<{ marked_good: boolean }>(U.a, q, [id(400)]))[0]!.marked_good).toBe(false);
+  });
+
   it('keyframe storage follows player access', async () => {
     await as(
       U.a,

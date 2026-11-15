@@ -97,6 +97,7 @@ export async function runAnalysis(p: RunParams): Promise<MotionAnalysis> {
     keyframes,
     video_blob_key: videoKey,
     note: null,
+    marked_good: false,
     created_by: p.createdBy,
   });
   sessionVideos.set(id, p.videoUrl);

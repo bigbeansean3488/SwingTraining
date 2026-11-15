@@ -27,6 +27,7 @@ import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
 import { ResultPage } from './features/analyze/ResultPage';
+import { MetricsGuide } from './features/analyze/MetricsGuide';
 import { ShootingGuide } from './features/analyze/ShootingGuide';
 import { Diagnostics } from './features/analyze/Diagnostics';
 import { Badge, Empty, Page } from './ui/components';
@@ -64,6 +65,8 @@ function analyzeRoute(route: Route): ReactNode {
     }
     case 'guide':
       return <ShootingGuide />;
+    case 'metrics':
+      return <MetricsGuide />;
     case 'diagnostics':
       return <Diagnostics />;
     case 'compare':
