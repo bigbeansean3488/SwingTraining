@@ -21,6 +21,8 @@ import { GamesHome } from './features/games/GamesHome';
 import { GameSetupPage } from './features/games/GameSetupPage';
 import { GameScorePage } from './features/games/GameScorePage';
 import { GameStatsPage, SeasonStatsPage } from './features/games/StatsPages';
+import { CoachOverview, ReportsHome } from './features/reports/ReportsPages';
+import { PlayerTimeline } from './features/reports/PlayerTimeline';
 import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
@@ -106,6 +108,11 @@ function moreRoute(route: Route): ReactNode {
       return id ? <PlayerPage key={id} id={id} /> : <PlayersPage />;
     case 'team':
       return <TeamPage />;
+    case 'reports':
+      if (id === 'team') return <CoachOverview />;
+      if (id === 'player' && route.path[3])
+        return <PlayerTimeline key={route.path[3]} id={route.path[3]} />;
+      return <ReportsHome />;
     case 'calendar':
       if (id === 'new') return <EventForm />;
       return id ? <EventPage key={id} id={id} /> : <CalendarPage />;

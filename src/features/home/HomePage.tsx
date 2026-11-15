@@ -2,12 +2,12 @@ import { Card, Page } from '../../ui/components';
 import { href } from '../../lib/router';
 
 const TILES = [
-  { to: '/analyze', icon: '◎', title: '動作分析', desc: '手機影片骨架追蹤', ready: false },
-  { to: '/training', icon: '✎', title: '訓練紀錄', desc: '打擊、牛棚、體能', ready: false },
-  { to: '/games', icon: '⚾', title: '比賽記錄', desc: '逐打席或逐球', ready: false },
-  { to: '/more/team', icon: '☷', title: '球隊', desc: '名單、行事曆、出席', ready: false },
-  { to: '/more/players', icon: '☺', title: '球員', desc: '個人檔案與趨勢', ready: false },
-  { to: '/more/reports', icon: '▤', title: '報表', desc: '訓練與比賽對照', ready: false },
+  { to: '/analyze', icon: '◎', title: '動作分析', desc: '手機影片骨架追蹤', ready: true },
+  { to: '/training', icon: '✎', title: '訓練紀錄', desc: '打擊、牛棚、體能', ready: true },
+  { to: '/games', icon: '⚾', title: '比賽記錄', desc: '逐打席或逐球', ready: true },
+  { to: '/more/team', icon: '☷', title: '球隊', desc: '名單、行事曆、出席', ready: true },
+  { to: '/more/players', icon: '☺', title: '球員', desc: '個人檔案與趨勢', ready: true },
+  { to: '/more/reports', icon: '▤', title: '報表', desc: '訓練與比賽對照', ready: true },
 ];
 
 export function HomePage() {
