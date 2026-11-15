@@ -32,7 +32,7 @@ export default tseslint.config(
   },
   {
     // The analysis engine must stay pure: no React, DOM-bound modules or Supabase.
-    files: ['src/analysis/**/*.ts'],
+    files: ['src/analysis/**/*.ts', 'src/scoring/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -48,7 +48,7 @@ export default tseslint.config(
                 '**/lib/**',
                 '**/pose/**',
               ],
-              message: 'src/analysis must stay pure.',
+              message: 'src/analysis and src/scoring must stay pure.',
             },
           ],
         },
