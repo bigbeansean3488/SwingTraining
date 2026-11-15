@@ -19,6 +19,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // React Compiler is not used; these compiler-oriented rules flag common, valid effect patterns.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/use-memo': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -28,7 +32,7 @@ export default tseslint.config(
   },
   {
     // The analysis engine must stay pure: no React, DOM-bound modules or Supabase.
-    files: ['src/analysis/**/*.ts'],
+    files: ['src/analysis/**/*.ts', 'src/scoring/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -44,7 +48,7 @@ export default tseslint.config(
                 '**/lib/**',
                 '**/pose/**',
               ],
-              message: 'src/analysis must stay pure.',
+              message: 'src/analysis and src/scoring must stay pure.',
             },
           ],
         },

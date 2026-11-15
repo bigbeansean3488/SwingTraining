@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": false,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "useDefineForClassFields": true,
     "types": ["vite/client", "vite-plugin-pwa/client", "node"]
   },
