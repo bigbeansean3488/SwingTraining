@@ -94,10 +94,7 @@ function battingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, Metric
   ]);
 
   // Pelvis shift: stance pelvis centre -> pelvis centre at contact.
-  const hipRef = mid(
-    medianPos(tr, LM.L_HIP, refA, refB),
-    medianPos(tr, LM.R_HIP, refA, refB),
-  );
+  const hipRef = mid(medianPos(tr, LM.L_HIP, refA, refB), medianPos(tr, LM.R_HIP, refA, refB));
   const hipC = tr.mid(LM.L_HIP, LM.R_HIP, iC);
   out.pelvis_shift = fig('contact', iC, [
     { type: 'ghost', at: hipRef },

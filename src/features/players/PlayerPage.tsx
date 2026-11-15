@@ -17,7 +17,13 @@ import {
   Tabs,
 } from '../../ui/components';
 import { LineChart } from '../../ui/LineChart';
-import { formatMetric, KIND_LABEL, METRIC_INFO, METRIC_ORDER } from '../analyze/metricInfo';
+import {
+  formatMetric,
+  infoFor,
+  KIND_LABEL,
+  METRIC_INFO,
+  METRIC_ORDER,
+} from '../analyze/metricInfo';
 import { LOG_KIND_LABEL, logSummary } from '../training/trainingInfo';
 import { useTeamReplays } from '../games/gameData';
 import { BattingTable, PitchingTable } from '../games/StatsTables';
@@ -158,7 +164,7 @@ function AnalysisList({ playerId }: { playerId: string }) {
         <ListLink
           key={a.id}
           to={`/analyze/${a.id}`}
-          title={`${KIND_LABEL[a.kind]}・${new Date(a.recorded_at).toLocaleDateString('zh-TW')}`}
+          title={`${a.marked_good ? '★ ' : ''}${KIND_LABEL[a.kind]}・${new Date(a.recorded_at).toLocaleDateString('zh-TW')}`}
           subtitle={`${a.fps.toFixed(0)} fps・引擎 v${a.engine_version}`}
           right={a.quality.ok ? <Badge kind="ok">完成</Badge> : <Badge kind="error">需重拍</Badge>}
         />
@@ -216,7 +222,7 @@ function Trends({ playerId }: { playerId: string }) {
               reference={points.length >= 2 ? { y: avg, label: '平均' } : undefined}
             />
             <p className="small muted" style={{ margin: 0 }}>
-              {METRIC_INFO[key]?.desc} 共 {points.length} 次。2D 估計值，只適合看自己的趨勢。
+              {infoFor(kind, key)?.what} 共 {points.length} 次。2D 估計值，只適合看自己的趨勢。
             </p>
           </div>
         </Card>

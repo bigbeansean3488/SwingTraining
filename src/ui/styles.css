@@ -665,3 +665,206 @@ table.data td:first-child {
   margin-right: 6px;
   background: var(--dot);
 }
+
+/* --- Readable metrics ---------------------------------------------------- */
+.metric-group + .metric-group {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 2px solid var(--line);
+}
+.metric-group h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.metric-group-about {
+  margin: 2px 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.metric-what {
+  font-size: 15px;
+  margin-top: 2px;
+}
+.metric-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.metric details,
+.disclosure {
+  margin-top: 8px;
+}
+.metric summary,
+.disclosure > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--brand);
+  list-style: none;
+}
+.metric summary::-webkit-details-marker,
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.metric summary::before,
+.disclosure > summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.metric details[open] > summary::before,
+.disclosure[open] > summary::before {
+  transform: rotate(90deg);
+}
+.explain dt {
+  font-weight: 700;
+  margin-top: 10px;
+}
+.explain dd {
+  margin: 2px 0 0;
+}
+.lit {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--line);
+  background: var(--surface);
+  border-radius: 0 10px 10px 0;
+  font-size: 15px;
+}
+.lit p {
+  margin: 6px 0;
+}
+.lit a {
+  color: var(--brand);
+}
+.metric-figure {
+  margin: 8px 0 0;
+}
+.metric-figure svg {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  border-radius: 10px;
+  background: #111827;
+}
+.metric-figure figcaption {
+  margin-top: 4px;
+}
+.range-bar svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 420px;
+  margin-top: 6px;
+}
+.range-track {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+.range-band {
+  fill: var(--surface-2);
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.range-mean {
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+.range-ref {
+  fill: none;
+  stroke: var(--series-3);
+  stroke-width: 3;
+}
+.range-now {
+  fill: var(--series-1);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+.range-axis {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.range-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+}
+.range-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.range-legend .dot-now {
+  border-radius: 50%;
+  background: var(--series-1);
+}
+.range-legend .dot-ref {
+  border: 3px solid var(--series-3);
+  transform: rotate(45deg) scale(0.75);
+}
+.range-legend .swatch-band {
+  background: var(--surface-2);
+  border: 1px solid var(--muted);
+  border-radius: 3px;
+}
+.phase-bar {
+  margin: 6px 0 4px;
+}
+.phase-track {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+}
+.phase-seg {
+  border-radius: 4px;
+  min-width: 6px;
+}
+.phase-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 4px;
+}
+.phase-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.phase-list i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+.phase-list strong {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.torso-illus {
+  width: 128px;
+  height: auto;
+  flex: none;
+  color: var(--text);
+}
+.summary-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.summary-list li {
+  margin: 6px 0;
+}
+.good-toggle[aria-pressed='true'] {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: var(--ok);
+}
