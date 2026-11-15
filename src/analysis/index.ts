@@ -1,5 +1,6 @@
 // Public entry point of the analysis engine.
 import { analyzeBatting } from './batting';
+import { analyzePitching } from './pitching';
 import type { AnalysisOptions, AnalysisResult, MotionKind, PoseSequence } from './types';
 
 export { ENGINE_VERSION } from './common';
@@ -15,11 +16,10 @@ export interface AnalyzeOptions extends AnalysisOptions {
 }
 
 type Analyzer = (seq: PoseSequence, opts?: AnalysisOptions) => AnalysisResult;
-const analyzers: Partial<Record<MotionKind, Analyzer>> = { batting: analyzeBatting };
-
-export function registerAnalyzer(kind: MotionKind, fn: Analyzer) {
-  analyzers[kind] = fn;
-}
+const analyzers: Record<MotionKind, Analyzer> = {
+  batting: analyzeBatting,
+  pitching: analyzePitching,
+};
 
 export function analyze(
   kind: MotionKind,
@@ -27,7 +27,6 @@ export function analyze(
   opts: AnalyzeOptions = {},
 ): AnalysisResult {
   const fn = analyzers[kind];
-  if (!fn) throw new Error(`no analyzer for ${kind}`);
   const s = opts.timeScale && opts.timeScale > 0 ? opts.timeScale : 1;
   if (s === 1) return fn(seq, opts);
   const scaled: PoseSequence = { ...seq, frames: seq.frames.map((f) => ({ ...f, t: f.t * s })) };

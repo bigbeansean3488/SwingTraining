@@ -18,8 +18,9 @@ import {
 } from '../../ui/components';
 import { LineChart } from '../../ui/LineChart';
 import { formatMetric, KIND_LABEL, METRIC_INFO, METRIC_ORDER } from '../analyze/metricInfo';
+import { LOG_KIND_LABEL, logSummary } from '../training/trainingInfo';
 
-type Tab = 'profile' | 'analyses' | 'trend';
+type Tab = 'profile' | 'analyses' | 'trend' | 'training';
 
 export function PlayerPage({ id }: { id: string }) {
   const p = useRow('profiles', id);
@@ -45,12 +46,14 @@ export function PlayerPage({ id }: { id: string }) {
         options={[
           { value: 'trend', label: '趨勢' },
           { value: 'analyses', label: '分析紀錄' },
+          { value: 'training', label: '訓練' },
           { value: 'profile', label: '基本資料' },
         ]}
       />
       {tab === 'profile' ? <ProfileForm p={p} editable={access.canEditPlayer(p.id)} /> : null}
       {tab === 'analyses' ? <AnalysisList playerId={p.id} /> : null}
       {tab === 'trend' ? <Trends playerId={p.id} /> : null}
+      {tab === 'training' ? <TrainingList playerId={p.id} /> : null}
     </Page>
   );
 }
@@ -214,6 +217,24 @@ function Trends({ playerId }: { playerId: string }) {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+function TrainingList({ playerId }: { playerId: string }) {
+  const rows = useRows('training_logs', (r) => r.player_id === playerId, [playerId]);
+  const sorted = [...(rows ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+  if (!sorted.length) return <Empty>還沒有訓練紀錄。</Empty>;
+  return (
+    <div className="list">
+      {sorted.map((l) => (
+        <ListLink
+          key={l.id}
+          to={`/training/log/${l.id}`}
+          title={`${l.date}・${LOG_KIND_LABEL[l.kind]}`}
+          subtitle={logSummary(l)}
+        />
+      ))}
     </div>
   );
 }

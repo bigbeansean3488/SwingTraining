@@ -130,14 +130,12 @@ describe('sync', () => {
     const p = await saveRow('profiles', profile('x'));
     await syncOnce(remote);
     // Simulate the other device deleting it later.
-    tables
-      .get('profiles')!
-      .set(p.id, {
-        ...tables.get('profiles')!.get(p.id)!,
-        deleted_at: '2999-01-01T00:00:00Z',
-        updated_at: '2999-01-01T00:00:00Z',
-        server_updated_at: '2999-01-01T00:00:00Z',
-      });
+    tables.get('profiles')!.set(p.id, {
+      ...tables.get('profiles')!.get(p.id)!,
+      deleted_at: '2999-01-01T00:00:00Z',
+      updated_at: '2999-01-01T00:00:00Z',
+      server_updated_at: '2999-01-01T00:00:00Z',
+    });
     await syncOnce(remote);
     expect((await getRaw('profiles', p.id))!.deleted_at).toBe('2999-01-01T00:00:00Z');
   });
