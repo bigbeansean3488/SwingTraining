@@ -303,12 +303,12 @@ describe('row-level security', () => {
   it('last write wins: an older client change does not overwrite a newer one', async () => {
     await as(
       U.a,
-      `update motion_analyses set note = 'new', updated_at = '2026-11-15T00:00:00Z' where id = $1`,
+      `update motion_analyses set note = 'new', updated_at = '2099-01-02T00:00:00Z' where id = $1`,
       [id(400)],
     );
     await as(
       U.a,
-      `update motion_analyses set note = 'old', updated_at = '2026-11-14T12:00:00Z' where id = $1`,
+      `update motion_analyses set note = 'old', updated_at = '2099-01-01T00:00:00Z' where id = $1`,
       [id(400)],
     );
     const [r] = await as<{ note: string }>(U.a, `select note from motion_analyses where id = $1`, [
@@ -321,7 +321,7 @@ describe('row-level security', () => {
     await as(
       U.a,
       `insert into motion_analyses (id, player_id, kind, recorded_at, fps, model_version, engine_version, keypoints, note, updated_at)
-      values ($1, $2, 'batting', $3, 240, 'm', '1.0.0', 'gz:', 'stale', '2026-11-14T06:00:00Z')
+      values ($1, $2, 'batting', $3, 240, 'm', '1.0.0', 'gz:', 'stale', '2000-01-01T00:00:00Z')
       on conflict (id) do update set note = excluded.note, updated_at = excluded.updated_at`,
       [id(400), P.rosterA, NOW],
     );
