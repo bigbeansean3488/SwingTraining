@@ -9,3 +9,18 @@
 | PWA（manifest、service worker、圖示） | ✅ | ✅ 建置產生 `sw.js` | ⏳ |
 | GitHub Actions CI | ✅ | ⏳ 第一次推送後 | — |
 | Cloudflare Pages 部署步驟（README） | ✅ | — | ⏳ 需要使用者操作 |
+
+## 階段 1：單機骨架分析
+| 項目 | 已寫完 | 自動測試 | 實機確認 |
+|---|---|---|---|
+| 選取影片、讀容器幀率（mp4box） | ✅ | ✅ 桌機 Chrome（iPhone 4K H.264 影片讀到 31.6 fps） | ⏳ |
+| WebCodecs 逐幀擷取＋seek 備案 | ✅ | ✅ 桌機 Chrome WebCodecs；seek 路徑未在瀏覽器實測 | ⏳ |
+| MediaPipe 推論（GPU→CPU 備援） | ✅ | ✅ 桌機 Chrome GPU | ⏳ |
+| 骨架疊圖播放（逐幀、0.1～1× 速度） | ✅ | ✅ 桌機 Chrome 375px 目視 | ⏳ |
+| 打擊事件偵測與 13＋1 項指標 | ✅ | ✅ 37 項單元測試（240／120／30 fps、左打、雜訊） | ⏳ 需要真實揮棒影片 |
+| 品質管制與重拍提示 | ✅ | ✅ 單元測試＋瀏覽器（投球影片被正確拒絕） | ⏳ |
+| 手動修正事件、用新引擎重算 | ✅ | ⏳ 只有單元測試涵蓋重算邏輯 | ⏳ |
+| 關鍵幀截圖、匯出 JSON、IndexedDB 歷史 | ✅ | ✅ 桌機 Chrome | ⏳ |
+| 拍攝引導頁、診斷頁 | ✅ | — | ⏳ |
+| 重複分析結果一致 | ✅ | ✅ 桌機 Chrome：兩次關鍵點逐位元組相同 | ⏳ |
+| 技術風險 1～4 | 做法已寫進 DECISIONS D9 | 桌機數據 | ⏳ 需要 iPhone 與 Android 實測 |
