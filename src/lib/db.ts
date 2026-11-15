@@ -116,28 +116,66 @@ export async function deleteRow(table: TableName, id: string): Promise<void> {
 }
 
 /**
- * Apply rows pulled from the server. Last-write-wins on `updated_at`; a local
- * row with a newer change that is still queued wins until it is pushed.
+ * Apply rows pulled from the server. Last-write-wins on updated_at: a local
+ * row with a newer change (normally still queued in the outbox) is kept and
+ * will overwrite the server copy when pushed. Local-only columns survive.
  */
 export async function applyRemoteRows(table: TableName, rows: BaseRow[]): Promise<number> {
   if (!rows.length) return 0;
   const d = await db();
-  const pending = new Set(
-    (await pendingOutbox()).filter((o) => o.table === table).map((o) => o.id),
-  );
   const tx = d.transaction(table, 'readwrite');
   let applied = 0;
   for (const r of rows) {
     const local = (await tx.store.get(r.id)) as BaseRow | undefined;
-    if (local && pending.has(r.id) && local.updated_at > r.updated_at) continue;
-    if (local && local.updated_at > r.updated_at && !pending.has(r.id)) continue;
-    // Preserve local-only columns.
+    if (local && local.updated_at > r.updated_at) continue;
     await tx.store.put({ ...(local ?? {}), ...r });
     applied++;
   }
   await tx.done;
   if (applied) emit(table);
   return applied;
+}
+
+/** Write a row locally without queueing it for sync (server-originated changes). */
+export async function putLocal(table: TableName, row: BaseRow): Promise<void> {
+  await (await db()).put(table, row);
+  emit(table);
+}
+
+/** Remove a row and its queued changes entirely (rows that never reached the server). */
+export async function purgeLocal(table: TableName, id: string): Promise<void> {
+  const d = await db();
+  const tx = d.transaction([table, 'outbox'], 'readwrite');
+  await tx.objectStore(table).delete(id);
+  let cursor = await tx.objectStore('outbox').openCursor();
+  while (cursor) {
+    const v = cursor.value as OutboxItem;
+    if (v.table === table && v.id === id) await cursor.delete();
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+  emit(table);
+  emit('outbox');
+}
+
+/** Raw row including tombstones. */
+export async function getRaw<T extends TableName>(
+  table: T,
+  id: string,
+): Promise<RowByTable[T] | undefined> {
+  return (await (await db()).get(table, id)) as RowByTable[T] | undefined;
+}
+
+/** Delete every local row, blob, queued change and setting (sign-out on a shared phone). */
+export async function clearAllLocal(): Promise<void> {
+  const d = await db();
+  const stores = [...TABLES, 'outbox', 'blobs', 'meta'] as const;
+  const tx = d.transaction([...stores], 'readwrite');
+  for (const s of stores) await tx.objectStore(s).clear();
+  await tx.done;
+  for (const t of TABLES) emit(t);
+  emit('meta');
+  emit('outbox');
 }
 
 export async function pendingOutbox(): Promise<OutboxItem[]> {
