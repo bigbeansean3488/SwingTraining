@@ -30,6 +30,13 @@ export interface SynthOptions {
   stride?: number;
   /** Multiply all event times (tempo change). */
   tempo?: number;
+  /**
+   * Pitching: how far (torso units) the rear foot swings forward after
+   * release. Real pitchers often swing it past the stride foot.
+   */
+  rearFollow?: number;
+  /** From this time on, MediaPipe's left/right leg labels are swapped (knee to toe). */
+  swapLegsAfter?: number;
 }
 
 type P = [number, number];
@@ -213,6 +220,14 @@ function toLandmarks(
   return lm;
 }
 
+/** Swap the left/right labels of knee, ankle, heel and foot index (25..32). */
+function swapLegs(lm: SynthLandmark[], on: boolean): SynthLandmark[] {
+  if (!on) return lm;
+  const out = [...lm];
+  for (let i = 25; i <= 31; i += 2) [out[i], out[i + 1]] = [lm[i + 1]!, lm[i]!];
+  return out;
+}
+
 export function generateBatting(opts: SynthOptions): SynthSequence {
   const s = opts.forward ?? 1;
   const tempo = opts.tempo ?? 1;
@@ -223,7 +238,10 @@ export function generateBatting(opts: SynthOptions): SynthSequence {
     const t = i / opts.fps;
     frames.push({
       t: Math.round(t * 1e6) / 1e6,
-      lm: toLandmarks(battingPose(t, s, opts.stride, tempo), s, noise, opts.noisePx ?? 0),
+      lm: swapLegs(
+        toLandmarks(battingPose(t, s, opts.stride, tempo), s, noise, opts.noisePx ?? 0),
+        t >= (opts.swapLegsAfter ?? Infinity),
+      ),
     });
   }
   return { width: W, height: H, frames };
@@ -237,7 +255,13 @@ export interface PitchingTruth {
   forward: 1 | -1;
 }
 
-export function pitchingPose(t: number, s: 1 | -1, strideT = 1.6, tempo = 1): Record<string, P> {
+export function pitchingPose(
+  t: number,
+  s: 1 | -1,
+  strideT = 1.6,
+  tempo = 1,
+  rearFollow = 0.3,
+): Record<string, P> {
   const T = SYNTH_TORSO_PX;
   const k = (x: number) => x * tempo;
   // Phases: lift top 0.6 s, plant 1.0 s, release 1.15 s, finish ~1.25 s.
@@ -252,7 +276,10 @@ export function pitchingPose(t: number, s: 1 | -1, strideT = 1.6, tempo = 1): Re
   // Lead leg: lift (knee up) to 0.6 s, then stride to plant at 1.0 s.
   const lift = bump(t, k(0.2), k(1.0)) * 1.0;
   const leadAnkle: P = [800 + s * 40 + s * strideT * T * ss(t, k(0.6), k(1.0)), 950 - 160 * lift];
-  const rearAnkle: P = [800 - s * 40 + s * 0.3 * T * ss(t, k(1.1), k(1.3)), 950];
+  const rearAnkle: P = [
+    800 - s * 40 + s * rearFollow * T * ss(t, k(1.1), k(1.3)),
+    950 - (rearFollow > 0.3 ? 120 * bump(t, k(1.1), k(1.3)) : 0),
+  ];
   const L = 190;
   const leadKnee = knee(leadHip, leadAnkle, L, s);
   const rearKnee = knee(rearHip, rearAnkle, L, s);
@@ -310,7 +337,15 @@ export function generatePitching(opts: SynthOptions): SynthSequence {
     const t = i / opts.fps;
     frames.push({
       t: Math.round(t * 1e6) / 1e6,
-      lm: toLandmarks(pitchingPose(t, s, opts.stride, tempo), s, noise, opts.noisePx ?? 0),
+      lm: swapLegs(
+        toLandmarks(
+          pitchingPose(t, s, opts.stride, tempo, opts.rearFollow),
+          s,
+          noise,
+          opts.noisePx ?? 0,
+        ),
+        t >= (opts.swapLegsAfter ?? Infinity),
+      ),
     });
   }
   return { width: W, height: H, frames };

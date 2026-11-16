@@ -38,10 +38,11 @@ export interface Tracks {
 }
 
 export function buildTracks(
-  seq: PoseSequence,
+  input: PoseSequence,
   positionCutoffHz: number,
   speedCutoffHz: number,
 ): Tracks {
+  const seq = fixLegLabelSwaps(input);
   const srcT = seq.frames.map((f) => f.t);
   const fs = estimateFps(srcT);
   const t0 = srcT[0] ?? 0;
@@ -113,6 +114,54 @@ export function buildTracks(
   }
 
   return { fs, t, n, torso: median(torsoSamples), pos, fast, at, mid };
+}
+
+/** Left/right landmark pairs below the hip that side views tend to mislabel. */
+const LEG_PAIRS: [number, number][] = [
+  [LM.L_KNEE, LM.R_KNEE],
+  [LM.L_ANKLE, LM.R_ANKLE],
+  [LM.L_HEEL, LM.R_HEEL],
+  [LM.L_FOOT, LM.R_FOOT],
+];
+/** Swap only when the swapped assignment is this much closer to the previous frame. */
+export const SWAP_COST_RATIO = 0.5;
+
+/**
+ * From the side, the pose model often swaps the left/right labels of the legs
+ * for a stretch of frames. Before any filtering, each frame's knee and ankle
+ * labels are compared with the previous frame: when the crossed assignment is
+ * clearly closer, the leg labels (knee to toe) of that frame are swapped back.
+ * Returns a new sequence; the input is not modified.
+ */
+export function fixLegLabelSwaps(seq: PoseSequence): PoseSequence {
+  const key = [LM.L_KNEE, LM.R_KNEE, LM.L_ANKLE, LM.R_ANKLE];
+  let prev: { x: number; y: number }[] | null = null;
+  let changed = false;
+  const frames = seq.frames.map((f) => {
+    if (!f.lm) return f;
+    const ok = key.every((k) => (f.lm![k]?.v ?? 0) >= MIN_VISIBILITY);
+    if (!ok) return f;
+    const px = (k: number) => ({ x: f.lm![k]!.x * seq.width, y: f.lm![k]!.y * seq.height });
+    let cur = key.map(px);
+    if (prev) {
+      const d = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+        Math.hypot(a.x - b.x, a.y - b.y);
+      const same =
+        d(cur[0]!, prev[0]!) + d(cur[1]!, prev[1]!) + d(cur[2]!, prev[2]!) + d(cur[3]!, prev[3]!);
+      const crossed =
+        d(cur[0]!, prev[1]!) + d(cur[1]!, prev[0]!) + d(cur[2]!, prev[3]!) + d(cur[3]!, prev[2]!);
+      if (crossed < SWAP_COST_RATIO * same) {
+        const lm = [...f.lm];
+        for (const [l, r] of LEG_PAIRS) [lm[l], lm[r]] = [f.lm[r]!, f.lm[l]!];
+        cur = [cur[1]!, cur[0]!, cur[3]!, cur[2]!];
+        changed = true;
+        f = { ...f, lm };
+      }
+    }
+    prev = cur;
+    return f;
+  });
+  return changed ? { ...seq, frames } : seq;
 }
 
 /** Linear resampling that keeps NaN where either neighbor is missing. */
