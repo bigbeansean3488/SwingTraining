@@ -3,7 +3,7 @@ import { ENGINE_VERSION } from '../../analysis';
 import { useMeta } from '../../lib/hooks';
 import { prefetchModel, TASKS_VISION_VERSION, type PoseModel } from '../../pose/mediapipe';
 import { Button, Card, Notice, Page } from '../../ui/components';
-import type { LastRunStats } from './run';
+import type { LastErrorInfo, LastRunStats } from './run';
 
 interface Caps {
   webcodecs: boolean;
@@ -48,6 +48,7 @@ export function Diagnostics() {
   const [caps, setCaps] = useState<Caps | null>(null);
   const [dl, setDl] = useState<string | null>(null);
   const last = useMeta<LastRunStats>('last_run');
+  const lastError = useMeta<LastErrorInfo>('last_error');
   useEffect(() => {
     detectCaps().then(setCaps);
   }, []);
@@ -114,6 +115,7 @@ export function Diagnostics() {
             </div>
             <div>3 秒 240 fps（720 幀）預估：{((last.msPerFrame * 720) / 1000).toFixed(0)} 秒</div>
             {last.fallbackReason ? <div>改用逐格跳轉的原因：{last.fallbackReason}</div> : null}
+            {last.skippedFrames ? <div>讀不到而跳過的畫面：{last.skippedFrames} 幀</div> : null}
           </div>
         ) : (
           <p className="empty">還沒有分析紀錄。</p>
@@ -122,6 +124,24 @@ export function Diagnostics() {
           請把這一段截圖回報，用來記錄不同手機的速度（docs/DECISIONS.md）。
         </p>
       </Card>
+
+      {lastError ? (
+        <Card title="上一次失敗">
+          <div className="stack small mono">
+            <div>時間：{new Date(lastError.at).toLocaleString('zh-TW')}</div>
+            <div>
+              步驟：{lastError.stage === 'load' ? '讀取影片' : '分析畫面'}・代碼 {lastError.code}
+            </div>
+            <div>
+              檔案：{lastError.fileSizeMB} MB・{lastError.fileType}
+              {lastError.width ? `・${lastError.width}×${lastError.height}` : ''}
+              {lastError.fps ? `・${lastError.fps.toFixed(1)} fps` : ''}
+              {lastError.codec ? `・${lastError.codec}` : ''}
+            </div>
+          </div>
+          <p className="small muted">分析失敗時請把這一段截圖回報。</p>
+        </Card>
+      ) : null}
 
       <p className="small muted center">
         分析引擎 v{ENGINE_VERSION}・tasks-vision {TASKS_VISION_VERSION}

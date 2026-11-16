@@ -46,6 +46,22 @@ export interface LastRunStats {
   height: number;
   codec: string | null;
   fallbackReason: string | null;
+  /** Frames the seek fallback could not read (missing in older records). */
+  skippedFrames?: number;
+}
+
+/** Last failed analysis, shown on the diagnostics page. */
+export interface LastErrorInfo {
+  at: string;
+  /** 'load' = reading the selected file, 'analyze' = frame extraction and inference. */
+  stage: 'load' | 'analyze';
+  code: string;
+  fileSizeMB: number;
+  fileType: string;
+  fps: number | null;
+  width: number | null;
+  height: number | null;
+  codec: string | null;
 }
 
 export async function runAnalysis(p: RunParams): Promise<MotionAnalysis> {
@@ -121,6 +137,7 @@ function statsFrom(p: RunParams, ex: ExtractResult): LastRunStats {
     height: p.probe.height,
     codec: p.probe.codec,
     fallbackReason: ex.fallbackReason ?? null,
+    skippedFrames: ex.skippedFrames,
   };
 }
 
@@ -183,7 +200,7 @@ export async function captureKeyframes(
   for (const [event, t] of Object.entries(events)) {
     if (event === 'stance') continue;
     try {
-      await seekTo(video, t + 0.0005);
+      await seekTo(video, t + 0.0005, 15000);
       ctx.drawImage(video, 0, 0, w, h);
       const i = nearestFrame(times, t);
       drawSkeleton(ctx, seq.frames[i]?.lm ?? null, w, h, 0.6);
