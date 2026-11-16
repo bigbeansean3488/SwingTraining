@@ -366,6 +366,8 @@ export const WARNING_TEXT: Record<string, string> = {
   finish_not_in_clip: '收尾動作不在分析範圍內，收尾時間可能不準。',
   load_at_clip_start: '影片開始時已經在動作中，預備階段可能不完整。',
   lift_at_clip_start: '影片開始時已經在抬腿，抬腿最高點可能不準。',
+  stride_implausible:
+    '這次跨步量不出來（算出來是往後跨，可能是左右腳辨識錯誤，或手機沒有放在正側面），所以不顯示跨步長度。',
 };
 
 export function trendText(info: MetricInfo | undefined, trend: Trend): string {

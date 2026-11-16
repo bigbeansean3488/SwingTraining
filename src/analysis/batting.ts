@@ -2,9 +2,10 @@
 // facing the batter's front). See docs/METRICS.md §2 for definitions.
 import {
   ENGINE_VERSION,
+  battingLegs,
+  battingStride,
   confidenceAt,
   cutoffs,
-  findLeadLeg,
   firstBelowAfter,
   handSpeed,
   medianPos,
@@ -12,6 +13,7 @@ import {
   ms,
   normSpeed,
   onsetBefore,
+  sidesAt,
   widthClosingOnset,
 } from './common';
 import { angleAt, leanFromVertical } from './geometry';
@@ -40,7 +42,8 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
   const tr = buildTracks(seq, fc.position, fc.speed);
   if (!isNum(tr.torso) || tr.torso < 20) return { ...base(fc), failure: 'person_too_small' };
 
-  const { lead, forward } = findLeadLeg(tr);
+  const legs = battingLegs(tr);
+  const { lead, forward } = legs;
   const hands = handSpeed(tr);
   const ankle = normSpeed(tr, lead.ankle);
 
@@ -117,19 +120,20 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
   put('phase_plant_to_contact_ms', metric(ms(plantToContact), 'ms', phaseConf));
   put('phase_follow_ms', metric(ms(t[iF]! - t[iC]!), 'ms', phaseConf));
 
-  const ankleRef = medianPos(tr, lead.ankle, refA, refB);
-  const ankleP = tr.at(lead.ankle, iP);
-  put(
-    'stride_length',
-    metric(
-      ((ankleP.x - ankleRef.x) * forward) / T,
-      'torso',
-      confidenceAt(tr, [lead.ankle], [refB, iP]),
-      {
-        diagnostics: { torsoPx: Math.round(T) },
-      },
-    ),
-  );
+  const stride = battingStride(tr, legs, refA, refB, iP);
+  if (stride.value === null) warnings.push('stride_implausible');
+  else {
+    put(
+      'stride_length',
+      metric(stride.value, 'torso', confidenceAt(tr, [lead.ankle, legs.rear.ankle], [refB, iP]), {
+        diagnostics: {
+          torsoPx: Math.round(T),
+          raw: Math.round(stride.raw * 1000) / 1000,
+          labelSwapAtPlant: stride.swapped,
+        },
+      }),
+    );
+  }
 
   const hipRef = {
     x: (medianPos(tr, LM.L_HIP, refA, refB).x + medianPos(tr, LM.R_HIP, refA, refB).x) / 2,
@@ -150,8 +154,10 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
   put('head_dx', metric(((headC.x - headRef.x) * forward) / T, 'torso', headConf));
   put('head_dy', metric((headRef.y - headC.y) / T, 'torso', headConf));
 
-  const knee = (i: number) =>
-    angleAt(tr.at(lead.hip, i), tr.at(lead.knee, i), tr.at(lead.ankle, i));
+  const knee = (i: number) => {
+    const s = sidesAt(tr, legs, i).lead;
+    return angleAt(tr.at(s.hip, i), tr.at(s.knee, i), tr.at(s.ankle, i));
+  };
   put(
     'lead_knee_plant',
     metric(knee(iP), 'deg', confidenceAt(tr, [lead.hip, lead.knee, lead.ankle], [iP])),

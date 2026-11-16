@@ -3,14 +3,15 @@
 import {
   ENGINE_VERSION,
   LEFT,
-  RIGHT,
   confidenceAt,
   cutoffs,
-  findLeadLeg,
   firstBelowAfter,
   metric,
   ms,
   normSpeed,
+  pitchingLegs,
+  pitchingStride,
+  sidesAt,
 } from './common';
 import { angleAt, leanFromVertical } from './geometry';
 import { LM } from './landmarks';
@@ -38,15 +39,9 @@ export function analyzePitching(seq: PoseSequence, opts: AnalysisOptions = {}): 
   const tr = buildTracks(seq, fc.position, fc.speed);
   if (!isNum(tr.torso) || tr.torso < 20) return { ...base(fc), failure: 'person_too_small' };
 
-  const { lead, rear, forward } = findLeadLeg(tr);
-  // Throwing arm: the wrist that reaches the higher peak speed.
-  const lw = normSpeed(tr, LM.L_WRIST, true);
-  const rw = normSpeed(tr, LM.R_WRIST, true);
-  const lPeak = argmax(lw);
-  const rPeak = argmax(rw);
-  const throwSide = (lPeak >= 0 ? lw[lPeak]! : -1) > (rPeak >= 0 ? rw[rPeak]! : -1) ? LEFT : RIGHT;
-  const glove = throwSide === LEFT ? RIGHT : LEFT;
-  const wrist = throwSide === LEFT ? lw : rw;
+  // Stride leg from the knee lift before release, not the follow-through.
+  const legs = pitchingLegs(tr);
+  const { lead, rear, forward, throwSide, glove, wrist } = legs;
   const ankle = normSpeed(tr, lead.ankle);
 
   // --- Events ---------------------------------------------------------------
@@ -101,22 +96,26 @@ export function analyzePitching(seq: PoseSequence, opts: AnalysisOptions = {}): 
   put('phase_release_to_finish_ms', metric(ms(t[iF]! - t[iR]!), 'ms', phaseConf));
   put('phase_lift_to_release_ms', metric(ms(t[iR]! - t[iT]!), 'ms', phaseConf));
 
-  const leadA = tr.at(lead.ankle, iP);
-  const rearA = tr.at(rear.ankle, iP);
-  put(
-    'stride_length',
-    metric(
-      ((leadA.x - rearA.x) * forward) / T,
-      'torso',
-      confidenceAt(tr, [lead.ankle, rear.ankle], [iP]),
-      {
-        diagnostics: { torsoPx: Math.round(T), from: 'rear ankle at plant' },
-      },
-    ),
-  );
+  const stride = pitchingStride(tr, legs, iP);
+  if (stride.value === null) warnings.push('stride_implausible');
+  else {
+    put(
+      'stride_length',
+      metric(stride.value, 'torso', confidenceAt(tr, [lead.ankle, rear.ankle], [iP]), {
+        diagnostics: {
+          torsoPx: Math.round(T),
+          from: 'rear ankle at plant',
+          raw: Math.round(stride.raw * 1000) / 1000,
+          labelSwapAtPlant: stride.swapped,
+        },
+      }),
+    );
+  }
 
-  const knee = (i: number) =>
-    angleAt(tr.at(lead.hip, i), tr.at(lead.knee, i), tr.at(lead.ankle, i));
+  const knee = (i: number) => {
+    const s = sidesAt(tr, legs, i).lead;
+    return angleAt(tr.at(s.hip, i), tr.at(s.knee, i), tr.at(s.ankle, i));
+  };
   put(
     'lead_knee_plant',
     metric(knee(iP), 'deg', confidenceAt(tr, [lead.hip, lead.knee, lead.ankle], [iP])),

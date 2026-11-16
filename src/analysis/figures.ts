@@ -3,7 +3,17 @@
 // metric computations in batting.ts / pitching.ts, so a value read off the
 // figure equals the reported metric (checked in figures.test.ts).
 // Coordinates are image pixels of the (rotated) analysis frames.
-import { LEFT, RIGHT, cutoffs, findLeadLeg, handSpeed, medianPos, normSpeed } from './common';
+import {
+  battingLegs,
+  battingStride,
+  cutoffs,
+  handSpeed,
+  medianPos,
+  pitchingLegs,
+  pitchingStride,
+  sidesAt,
+  type Legs,
+} from './common';
 import type { Vec } from './geometry';
 import { LM } from './landmarks';
 import { assessClip } from './quality';
@@ -61,17 +71,27 @@ export function metricFigures(
   if (!tr.n || !isNum(tr.torso)) return EMPTY;
   const idx = (name: string) => (isNum(events[name]) ? indexAt(tr, events[name]! * s) : -1);
   const time = (i: number) => tr.t[i]! / s;
+  const legs = kind === 'batting' ? battingLegs(tr) : pitchingLegs(tr);
   const figures =
-    kind === 'batting' ? battingFigures(tr, idx, time) : pitchingFigures(tr, idx, time);
-  return { figures, torso: tr.torso, forward: findLeadLeg(tr).forward };
+    kind === 'batting' ? battingFigures(tr, legs, idx, time) : pitchingFigures(tr, idx, time);
+  return { figures, torso: tr.torso, forward: legs.forward };
 }
 
 type Idx = (name: string) => number;
 type Time = (i: number) => number;
 
-function battingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, MetricFigure> {
+function kneeShape(tr: Tracks, legs: Legs, i: number): FigureShape {
+  const s = sidesAt(tr, legs, i).lead;
+  return { type: 'angle', a: tr.at(s.hip, i), b: tr.at(s.knee, i), c: tr.at(s.ankle, i) };
+}
+
+function battingFigures(
+  tr: Tracks,
+  legs: Legs,
+  idx: Idx,
+  time: Time,
+): Record<string, MetricFigure> {
   const out: Record<string, MetricFigure> = {};
-  const { lead } = findLeadLeg(tr);
   const iL = idx('load');
   const iP = idx('plant');
   const iC = idx('contact');
@@ -86,12 +106,13 @@ function battingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, Metric
   });
 
   // Stride: stance ankle position -> ankle at plant (horizontal component).
-  const ankleRef = medianPos(tr, lead.ankle, refA, refB);
-  const ankleP = tr.at(lead.ankle, iP);
-  out.stride_length = fig('plant', iP, [
-    { type: 'ghost', at: ankleRef },
-    { type: 'arrow', from: { x: ankleRef.x, y: ankleP.y }, to: ankleP },
-  ]);
+  const stride = battingStride(tr, legs, refA, refB, iP);
+  if (stride.value !== null) {
+    out.stride_length = fig('plant', iP, [
+      { type: 'ghost', at: stride.from },
+      { type: 'arrow', from: { x: stride.from.x, y: stride.to.y }, to: stride.to },
+    ]);
+  }
 
   // Pelvis shift: stance pelvis centre -> pelvis centre at contact.
   const hipRef = mid(medianPos(tr, LM.L_HIP, refA, refB), medianPos(tr, LM.R_HIP, refA, refB));
@@ -113,14 +134,8 @@ function battingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, Metric
     { type: 'arrow', from: { x: headC.x, y: headRef.y }, to: headC },
   ]);
 
-  const knee = (i: number): FigureShape => ({
-    type: 'angle',
-    a: tr.at(lead.hip, i),
-    b: tr.at(lead.knee, i),
-    c: tr.at(lead.ankle, i),
-  });
-  out.lead_knee_plant = fig('plant', iP, [knee(iP)]);
-  out.lead_knee_contact = fig('contact', iC, [knee(iC)]);
+  out.lead_knee_plant = fig('plant', iP, [kneeShape(tr, legs, iP)]);
+  out.lead_knee_contact = fig('contact', iC, [kneeShape(tr, legs, iC)]);
   out.trunk_tilt_contact = fig('contact', iC, trunkShapes(tr, iC));
 
   // Hands: path of the wrist midpoint from plant to finish, peak marked.
@@ -142,7 +157,8 @@ function battingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, Metric
 
 function pitchingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, MetricFigure> {
   const out: Record<string, MetricFigure> = {};
-  const { lead, rear } = findLeadLeg(tr);
+  const legs = pitchingLegs(tr);
+  const { throwSide, glove } = legs;
   const iP = idx('plant');
   const iR = idx('release');
   if (iP < 0 || iR < 0) return out;
@@ -152,29 +168,16 @@ function pitchingFigures(tr: Tracks, idx: Idx, time: Time): Record<string, Metri
     shapes,
   });
 
-  // Same throwing-arm choice as pitching.ts: the wrist with the higher peak speed.
-  const lw = normSpeed(tr, LM.L_WRIST, true);
-  const rw = normSpeed(tr, LM.R_WRIST, true);
-  const lPeak = argmax(lw);
-  const rPeak = argmax(rw);
-  const throwSide = (lPeak >= 0 ? lw[lPeak]! : -1) > (rPeak >= 0 ? rw[rPeak]! : -1) ? LEFT : RIGHT;
-  const glove = throwSide === LEFT ? RIGHT : LEFT;
+  const stride = pitchingStride(tr, legs, iP);
+  if (stride.value !== null) {
+    out.stride_length = fig('plant', iP, [
+      { type: 'ghost', at: stride.from },
+      { type: 'arrow', from: { x: stride.from.x, y: stride.to.y }, to: stride.to },
+    ]);
+  }
 
-  const leadA = tr.at(lead.ankle, iP);
-  const rearA = tr.at(rear.ankle, iP);
-  out.stride_length = fig('plant', iP, [
-    { type: 'ghost', at: rearA },
-    { type: 'arrow', from: { x: rearA.x, y: leadA.y }, to: leadA },
-  ]);
-
-  const knee = (i: number): FigureShape => ({
-    type: 'angle',
-    a: tr.at(lead.hip, i),
-    b: tr.at(lead.knee, i),
-    c: tr.at(lead.ankle, i),
-  });
-  out.lead_knee_plant = fig('plant', iP, [knee(iP)]);
-  out.lead_knee_release = fig('release', iR, [knee(iR)]);
+  out.lead_knee_plant = fig('plant', iP, [kneeShape(tr, legs, iP)]);
+  out.lead_knee_release = fig('release', iR, [kneeShape(tr, legs, iR)]);
   out.trunk_forward_release = fig('release', iR, trunkShapes(tr, iR));
 
   const sA = tr.at(glove.shoulder, iP);

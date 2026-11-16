@@ -7,8 +7,26 @@ import { useCurrentTeam } from '../../lib/team';
 import { loadVideoElement, probeVideo, type VideoProbe } from '../../pose/extract';
 import type { PoseModel } from '../../pose/mediapipe';
 import { Button, Card, Field, LinkButton, Notice, Page } from '../../ui/components';
+import { setMeta } from '../../lib/db';
 import { KIND_LABEL } from './metricInfo';
-import { runAnalysis } from './run';
+import { runAnalysis, type LastErrorInfo } from './run';
+
+const TRIM_HINT =
+  '可以先在「照片」App 把影片剪到只剩動作前後幾秒再選取；iPhone 也可以把「設定 → 相機 → 格式」改成「最相容」，讀取會比較快。';
+
+/** User-facing text for errors thrown while reading or analyzing a video. */
+function errorText(code: string): string {
+  switch (code) {
+    case 'video_unsupported':
+      return '這支手機的瀏覽器無法讀取這個影片格式。請改用相機 App 直接拍攝的影片。';
+    case 'video_load_timeout':
+      return `影片讀取超過 1 分鐘沒有進展，可能是檔案太大（例如 4K 或很長的影片）。${TRIM_HINT}`;
+    case 'seek_failed':
+      return `這支手機讀取影片畫面太慢，有太多畫面讀不到。${TRIM_HINT}也可以在「進階選項」把「降採樣」改成每 2 幀。`;
+    default:
+      return `分析失敗（${code}）。可以在「進階選項」改用較小的模型，或到「診斷」頁截圖回報。`;
+  }
+}
 
 type Phase = 'pick' | 'probing' | 'ready' | 'running' | 'error';
 
@@ -72,12 +90,25 @@ export function NewAnalysis({
       setPhase('ready');
     } catch (err) {
       setPhase('error');
-      setError(
-        (err as Error).message === 'video_unsupported'
-          ? '這支手機的瀏覽器無法讀取這個影片格式。請改用相機 App 直接拍攝的影片。'
-          : `無法讀取影片：${(err as Error).message}`,
-      );
+      const code = (err as Error).message;
+      setError(errorText(code));
+      void recordError('load', code, f, null);
     }
+  }
+
+  function recordError(stage: LastErrorInfo['stage'], code: string, f: File, p: VideoProbe | null) {
+    const info: LastErrorInfo = {
+      at: new Date().toISOString(),
+      stage,
+      code,
+      fileSizeMB: Math.round((f.size / 1e6) * 10) / 10,
+      fileType: f.type || f.name.split('.').pop() || '—',
+      fps: p?.fps ?? null,
+      width: p?.width ?? null,
+      height: p?.height ?? null,
+      codec: p?.codec ?? null,
+    };
+    return setMeta('last_error', info).catch(() => {});
   }
 
   const fps = probe?.fps ?? 30;
@@ -120,9 +151,9 @@ export function NewAnalysis({
       }
       console.error(err);
       setPhase('error');
-      setError(
-        `分析失敗：${(err as Error).message}。可以在選項中改用較小的模型，或到「診斷」頁回報這個訊息。`,
-      );
+      const code = (err as Error).message;
+      setError(errorText(code));
+      void recordError('analyze', code, file, probe);
     }
   }
 

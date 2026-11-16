@@ -46,25 +46,55 @@ export interface ExtractResult {
   processingMs: number;
   inferMs: number;
   frames: number;
+  /** Frames that could not be read in the seek fallback (left out of the sequence). */
+  skippedFrames: number;
   fallbackReason?: string;
 }
 
-export function loadVideoElement(url: string): Promise<HTMLVideoElement> {
+/** Give up loading when no data arrives for this long (reset on every progress event). */
+export const VIDEO_LOAD_IDLE_MS = 60000;
+
+/**
+ * Resolves once duration and size are known (loadedmetadata). iOS Safari often
+ * never fires loadeddata for an off-screen video that is not playing, so
+ * waiting for frame data here made large clips time out (frames are decoded
+ * later, by WebCodecs or by seeking).
+ */
+export function loadVideoElement(
+  url: string,
+  idleMs = VIDEO_LOAD_IDLE_MS,
+): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
     v.muted = true;
     v.playsInline = true;
     v.preload = 'auto';
-    v.src = url;
-    const timer = setTimeout(() => reject(new Error('video_load_timeout')), 15000);
-    v.onloadeddata = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
       clearTimeout(timer);
+      v.onloadedmetadata = null;
+      v.onprogress = null;
+      v.onerror = null;
+    };
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('video_load_timeout'));
+      }, idleMs);
+    };
+    v.onloadedmetadata = () => {
+      cleanup();
       resolve(v);
     };
+    v.onprogress = arm;
     v.onerror = () => {
-      clearTimeout(timer);
+      cleanup();
       reject(new Error('video_unsupported'));
     };
+    arm();
+    v.src = url;
+    v.load();
   });
 }
 
@@ -182,6 +212,7 @@ export async function extractPoses(
   };
 
   let method: ExtractMethod = 'seek';
+  let skippedFrames = 0;
   let fallbackReason: string | undefined;
   try {
     const useWebCodecs = probe.webcodecs && probe.demux && opts.forceMethod !== 'seek';
@@ -202,7 +233,7 @@ export async function extractPoses(
       landmarker.close();
       const fresh = await createLandmarker(opts.model, opts.preferCpu);
       Object.assign(landmarker, { detect: fresh.detect, close: fresh.close });
-      await decodeBySeeking(video, probe, opts, (t) =>
+      skippedFrames = await decodeBySeeking(video, probe, opts, (t) =>
         infer(video, video.videoWidth, video.videoHeight, 0, t),
       );
     }
@@ -226,6 +257,7 @@ export async function extractPoses(
     processingMs: Math.round(performance.now() - t0),
     inferMs: Math.round(inferMs),
     frames: frames.length,
+    skippedFrames,
     fallbackReason,
   };
 }
@@ -346,6 +378,11 @@ async function decodeWithWebCodecs(
 export function seekTo(video: HTMLVideoElement, t: number, timeoutMs = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
     const target = Math.min(Math.max(t, 0), video.duration || t);
+    // Setting currentTime to its current value fires no 'seeked' event.
+    if (Math.abs(video.currentTime - target) < 1e-6 && video.readyState >= 2) {
+      resolve();
+      return;
+    }
     const timer = setTimeout(() => {
       video.removeEventListener('seeked', onSeeked);
       reject(new Error('seek_timeout'));
@@ -370,12 +407,16 @@ export function seekTo(video: HTMLVideoElement, t: number, timeoutMs = 8000): Pr
   });
 }
 
+/** Seek fallback: a frame that times out twice is skipped, up to this share of frames. */
+export const MAX_SKIPPED_FRACTION = 0.05;
+
+/** Returns the number of skipped frames; throws 'seek_failed' when too many fail. */
 async function decodeBySeeking(
   video: HTMLVideoElement,
   probe: VideoProbe,
   opts: ExtractOptions,
   infer: (t: number) => void,
-): Promise<void> {
+): Promise<number> {
   let times: number[];
   if (probe.demux) {
     times = probe.demux.frameTimes;
@@ -387,12 +428,26 @@ async function decodeBySeeking(
   const inRange = times.filter((t) => t >= opts.start - 1e-6 && t <= opts.end + 1e-6);
   const picked = inRange.filter((_, i) => i % opts.frameStride === 0);
   const half = probe.fps ? 0.3 / probe.fps : 0.005;
+  const maxSkipped = Math.max(3, Math.floor(picked.length * MAX_SKIPPED_FRACTION));
+  let skipped = 0;
   for (let k = 0; k < picked.length; k++) {
     if (opts.signal?.aborted) throw new DOMException('cancelled', 'AbortError');
-    await seekTo(video, picked[k]! + half);
-    infer(picked[k]!);
+    let ok = true;
+    try {
+      await seekTo(video, picked[k]! + half);
+    } catch {
+      // One retry with a longer wait: a slow seek often completes the second time.
+      try {
+        await seekTo(video, picked[k]! + half, 15000);
+      } catch {
+        ok = false;
+      }
+    }
+    if (ok) infer(picked[k]!);
+    else if (++skipped > maxSkipped) throw new Error('seek_failed');
     opts.onProgress?.(k + 1, picked.length);
   }
+  return skipped;
 }
 
 /** Frame rate from requestVideoFrameCallback during a short muted playback; 30 if unknown. */

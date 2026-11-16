@@ -463,8 +463,8 @@ function MetricGroups({
         unit={m.unit}
         confidence={m.confidence}
         experimental={!!m.experimental}
-        past={past.map((r) => r.metrics[k]?.value).filter(isFiniteNum)}
-        refs={refRows.map((r) => r.metrics[k]?.value).filter(isFiniteNum)}
+        past={past.map((r) => usable(k, r.metrics[k]?.value)).filter(isFiniteNum)}
+        refs={refRows.map((r) => usable(k, r.metrics[k]?.value)).filter(isFiniteNum)}
         refDiff={references?.metrics.find((x) => x.key === k)}
         stability={feedback?.stability[k]}
         figure={
@@ -511,6 +511,14 @@ function MetricGroups({
       })}
     </div>
   );
+}
+
+/**
+ * Engine 1.0.x could store a negative stride (wrong foot or direction); such
+ * values are left out of comparisons until that analysis is recomputed.
+ */
+function usable(key: string, v: number | undefined): number | undefined {
+  return key === 'stride_length' && typeof v === 'number' && v < 0 ? undefined : v;
 }
 
 function isFiniteNum(v: number | undefined): v is number {
