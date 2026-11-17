@@ -51,13 +51,13 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
     label: '踩下到擊球',
     what: '前腳踩穩到擊球瞬間的時間。',
     why: '代表前腳踩穩之後，多快把棒子揮到擊球點。',
-    limit: `擊球瞬間是用「手移動最快的時候」估計，不是真的看到球碰到棒子。${PHASE_LIMIT}`,
+    limit: `擊球瞬間是用「手移動最快之後約 0.06 秒」估計（依實驗室資料校正），不是真的看到球碰到棒子。${PHASE_LIMIT}`,
     big: '長',
     small: '短',
   }),
   phase_follow_ms: info({
     label: '擊球到收棒',
-    what: '擊球後，到手的速度慢下來（收棒）所花的時間。',
+    what: '擊球後，到送棒結束、手的速度慢下來（收棒）所花的時間。',
     why: '看擊球後的動作有沒有做完整。',
     limit: '影片太早結束時，收棒可能不在畫面裡而不準。',
     big: '長',
@@ -364,6 +364,7 @@ export const FAILURE_TEXT: Record<string, string> = {
 export const WARNING_TEXT: Record<string, string> = {
   fps_low: '影格率低於 100 fps，時間類指標精度有限。建議用 120 或 240 fps 慢動作拍攝。',
   finish_not_in_clip: '收尾動作不在分析範圍內，收尾時間可能不準。',
+  contact_not_in_clip: '分析範圍在擊球前就結束了。請把結束時間往後調，包含整個揮棒和收棒。',
   load_at_clip_start: '影片開始時已經在動作中，預備階段可能不完整。',
   lift_at_clip_start: '影片開始時已經在抬腿，抬腿最高點可能不準。',
   stride_implausible:

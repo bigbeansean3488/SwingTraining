@@ -5,7 +5,7 @@ import type { Tracks } from './tracks';
 import { argmax, derivative, isNum, mean, median, percentile } from './signal';
 import type { MetricResult } from './types';
 
-export const ENGINE_VERSION = '1.1.0';
+export const ENGINE_VERSION = '1.2.0';
 
 export const DEFAULT_POSITION_CUTOFF_HZ = 12;
 export const DEFAULT_SPEED_CUTOFF_HZ = 20;
@@ -89,7 +89,7 @@ export interface Legs {
 }
 
 /**
- * Batting: lead leg judged from the frames before contact (hand-speed peak).
+ * Batting: lead leg judged from the frames before the hand-speed peak.
  * Forward is where the lead foot stands relative to the rear foot in the
  * stance (the front foot is always nearer the pitcher), which stays right even
  * when the foot first moves backward; the motion direction is the fallback

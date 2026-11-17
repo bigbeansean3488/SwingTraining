@@ -212,6 +212,15 @@ describe('comparability', () => {
   it('is clean for the same engine major and no warnings', () => {
     expect(comparability(ok, { ...ok, engineVersion: '1.0.0', forward: -1 })).toEqual([]);
   });
+  it('with the motion kind, flags engine versions that measure it differently', () => {
+    const side = (engineVersion: string) => ({ engineVersion, warnings: [], forward: 1 });
+    // Batting contact moved in 1.2.0; pitching did not change.
+    expect(comparability(side('1.2.0'), side('1.1.0'), undefined, 'batting')).toEqual([
+      'engine_major_differs',
+    ]);
+    expect(comparability(side('1.2.0'), side('1.1.0'), undefined, 'pitching')).toEqual([]);
+  });
+
   it('flags engine major changes, quality warnings, unknown direction and missing events', () => {
     const w = buildTimeWarp(
       'batting',

@@ -36,7 +36,7 @@ export function deltaText(info: MetricInfo | undefined, d: MetricDelta): string 
 
 export const COMPARABILITY_TEXT: Record<ComparabilityIssue, string> = {
   engine_major_differs:
-    '這次分析和標竿是用不同主版本的分析引擎算的，公式可能不同。標竿是當時的複本；要更新，請在原本那次分析按「用目前引擎重新計算」後重新設為標竿。',
+    '這次分析和標竿是用量法不同的分析引擎版本算的（例如 1.2.0 起打擊的擊球時間改了），數值不能直接比。標竿是當時的複本；要更新，請在原本那次分析按「用目前引擎重新計算」後重新設為標竿。',
   user_warnings: '這次分析有品質提醒（例如影格率偏低或動作沒拍完整），差異只能參考。',
   ref_warnings: '標竿影片有品質提醒（例如影格率偏低或動作沒拍完整），差異只能參考。',
   direction_unknown: '有一邊看不出動作方向，骨架可能左右相反。',

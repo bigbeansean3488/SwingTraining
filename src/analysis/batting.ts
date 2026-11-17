@@ -25,6 +25,17 @@ import type { AnalysisOptions, AnalysisResult, EventTimes, Metrics, PoseSequence
 
 export const BATTING_EVENTS = ['stance', 'load', 'plant', 'contact', 'finish'] as const;
 
+/**
+ * Contact = hand-speed peak + this delay. The hands slow down before the bat
+ * meets the ball; in the OBP lab data contact follows the hand-speed peak by a
+ * median 61 ms (P10–P90 53–69 ms). See docs/METRICS.md §2.1.
+ */
+export const CONTACT_AFTER_HAND_PEAK_S = 0.06;
+/** Finish: hand speed below this fraction of the swing peak, after the follow-through. */
+export const FINISH_FRACTION = 0.2;
+/** The follow-through hand-speed peak is searched this long after contact. */
+export const FOLLOW_WINDOW_S = 0.4;
+
 export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): AnalysisResult {
   const quality = assessClip(seq);
   const base = (fc = { position: 0, speed: 0 }): AnalysisResult => ({
@@ -48,15 +59,33 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
   const ankle = normSpeed(tr, lead.ankle);
 
   // --- Event detection -----------------------------------------------------
-  let iC = argmax(hands);
-  const iA = argmax(ankle, 0, iC);
-  let iP = iA >= 0 ? firstBelowAfter(ankle, iA, Math.max(0.2 * ankle[iA]!, 0.5), iC) : -1;
-  let iL = iA >= 0 ? onsetBefore(ankle, iA, Math.max(0.1 * ankle[iA]!, 0.15)) : -1;
-  let iF = iC >= 0 ? firstBelowAfter(hands, iC, 0.25 * hands[iC]!) : -1;
+  const iH = argmax(hands);
+  const tC = iH >= 0 ? tr.t[iH]! + CONTACT_AFTER_HAND_PEAK_S : NaN;
   const warnings = [...quality.warnings];
-  if (iF < 0) {
-    iF = tr.n - 1;
-    warnings.push('finish_not_in_clip');
+  let iC = -1;
+  if (iH >= 0 && tC <= tr.t[tr.n - 1]!) iC = indexAt(tr, tC);
+  else if (iH >= 0) warnings.push('contact_not_in_clip');
+  // Stride: ankle speed peak before the hands peak; plant must come before contact.
+  const iA = argmax(ankle, 0, iH);
+  let iP =
+    iA >= 0 && iC >= 0 ? firstBelowAfter(ankle, iA, Math.max(0.2 * ankle[iA]!, 0.5), iC) : -1;
+  let iL = iA >= 0 ? onsetBefore(ankle, iA, Math.max(0.1 * ankle[iA]!, 0.15)) : -1;
+  // Right after contact the hands briefly slow down, then speed up again in
+  // the follow-through; the finish is when they slow down after that.
+  let iF = -1;
+  if (iC >= 0) {
+    let iDip = iC;
+    while (iDip + 1 < tr.n && isNum(hands[iDip + 1]) && hands[iDip + 1]! <= hands[iDip]!) iDip++;
+    const iFollow = argmax(
+      hands,
+      iDip,
+      Math.min(tr.n - 1, iDip + Math.round(FOLLOW_WINDOW_S * tr.fs)),
+    );
+    iF = firstBelowAfter(hands, iFollow, FINISH_FRACTION * hands[iH]!);
+    if (iF < 0) {
+      iF = tr.n - 1;
+      warnings.push('finish_not_in_clip');
+    }
   }
   if (iL === 0) warnings.push('load_at_clip_start');
 

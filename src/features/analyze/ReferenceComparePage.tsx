@@ -219,6 +219,7 @@ function Comparison({
     { engineVersion: row.engine_version, warnings: row.quality.warnings, forward: row.forward },
     { engineVersion: ref_.engine_version, warnings: ref_.quality.warnings, forward: ref_.forward },
     warp,
+    kind,
   );
   const deltas = useMemo(
     () =>

@@ -112,11 +112,13 @@ export function battingPose(t: number, s: 1 | -1, strideT = 0.65, tempo = 1): Re
   const leadKnee = knee(leadHip, leadAnkle, L, s);
   const rearKnee = knee(rearHip, rearAnkle, L, -s);
   const nose: P = [sh[0] + s * 10, sh[1] - 55 + 6 * ss(t, k(0.85), k(1.1))];
-  // Hands travel along an arc; path speed peaks exactly at contact.
-  const tc = k(1.1);
-  const sigma = 0.05 * tempo;
-  const u = normCdf((t - tc) / sigma);
-  const phi = ((200 - 260 * u) * Math.PI) / 180;
+  // Hands travel along an arc. As in lab data, hand path speed peaks before
+  // contact (HAND_PEAK_BEFORE_CONTACT_S), dips right after it, and rises
+  // again in the follow-through before the hands stop.
+  const tp = k(1.1) - HAND_PEAK_BEFORE_CONTACT_S * tempo;
+  const u = normCdf((t - tp) / (SWING_SIGMA * tempo));
+  const uf = normCdf((t - k(FOLLOW_PEAK_T)) / (FOLLOW_SIGMA * tempo));
+  const phi = ((200 - SWING_DEG * u - FOLLOW_DEG * uf) * Math.PI) / 180;
   const hand: P = [900 + s * 10 + s * 120 * Math.cos(phi), 520 + 120 * Math.sin(phi)];
   return {
     hip,
@@ -136,16 +138,39 @@ export function battingPose(t: number, s: 1 | -1, strideT = 0.65, tempo = 1): Re
   };
 }
 
-export function battingTruth(s: 1 | -1, tempo = 1): BattingTruth {
-  const sigma = 0.05 * tempo;
+/** Hand-speed peak precedes contact by this much (OBP lab median: 61 ms). */
+export const HAND_PEAK_BEFORE_CONTACT_S = 0.06;
+const SWING_SIGMA = 0.05;
+const SWING_DEG = 260;
+const FOLLOW_PEAK_T = 1.23;
+const FOLLOW_SIGMA = 0.06;
+const FOLLOW_DEG = 90;
+
+/** Angular hand speed of the model (deg/s); path speed is proportional to it. */
+function handRate(t: number, tempo: number): number {
+  const g = (x: number, m: number, sd: number) =>
+    Math.exp(-0.5 * ((x - m) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
+  const tp = (1.1 - HAND_PEAK_BEFORE_CONTACT_S) * tempo;
+  return (
+    SWING_DEG * g(t, tp, SWING_SIGMA * tempo) +
+    FOLLOW_DEG * g(t, FOLLOW_PEAK_T * tempo, FOLLOW_SIGMA * tempo)
+  );
+}
+
+export function battingTruth(s: 1 | -1, tempo = 1): BattingTruth & { handPeak: number } {
+  const handPeak = (1.1 - HAND_PEAK_BEFORE_CONTACT_S) * tempo;
+  const peak = handRate(handPeak, tempo);
+  // Finish: after the follow-through peak, hand speed falls below 20% of the swing peak.
+  let finish = FOLLOW_PEAK_T * tempo;
+  while (handRate(finish, tempo) >= 0.2 * peak) finish += 0.0001;
   return {
     events: {
       load: 0.5 * tempo,
       plant: 0.9 * tempo,
       contact: 1.1 * tempo,
-      // Hand speed falls to 25% of its Gaussian peak.
-      finish: 1.1 * tempo + sigma * Math.sqrt(2 * Math.log(4)),
+      finish,
     },
+    handPeak,
     forward: s,
   };
 }

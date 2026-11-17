@@ -13,6 +13,7 @@ import { MIN_DELTA } from './feedback';
 import { LM, LANDMARK_COUNT } from './landmarks';
 import { isNum, median } from './signal';
 import type { EventTimes, Landmark, Metrics, MotionKind, PoseSequence } from './types';
+import { sameDefinitions } from './versions';
 
 /** Events used for alignment, in motion order. */
 export const ALIGN_EVENTS: Record<MotionKind, string[]> = {
@@ -273,7 +274,10 @@ export interface ComparableSide {
 }
 
 export type ComparabilityIssue =
-  /** Engine major versions differ: formulas may differ. */
+  /**
+   * Engine versions measure this motion differently: a different major, or
+   * (when the kind is given) a different metric-definition generation.
+   */
   | 'engine_major_differs'
   /** The user's clip has quality warnings (low fps, partial clip, ...). */
   | 'user_warnings'
@@ -293,10 +297,13 @@ export function comparability(
   you: ComparableSide,
   ref: ComparableSide,
   warp?: TimeWarp,
+  kind?: MotionKind,
 ): ComparabilityIssue[] {
   const out: ComparabilityIssue[] = [];
-  if (engineMajor(you.engineVersion) !== engineMajor(ref.engineVersion))
-    out.push('engine_major_differs');
+  const same = kind
+    ? sameDefinitions(kind, you.engineVersion, ref.engineVersion)
+    : engineMajor(you.engineVersion) === engineMajor(ref.engineVersion);
+  if (!same) out.push('engine_major_differs');
   if (you.warnings.length) out.push('user_warnings');
   if (ref.warnings.length) out.push('ref_warnings');
   if (!you.forward || !ref.forward) out.push('direction_unknown');
