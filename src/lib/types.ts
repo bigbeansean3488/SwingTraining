@@ -15,6 +15,8 @@ export const TABLES = [
   'games',
   'lineups',
   'game_events',
+  // Last: a server that has not run its migration yet only affects this table.
+  'reference_motions',
 ] as const;
 export type TableName = (typeof TABLES)[number];
 
@@ -239,6 +241,48 @@ export interface GameEventRow extends BaseRow {
   created_by: string | null;
 }
 
+export type ArmSlot = 'overhand' | 'three_quarter' | 'sidearm' | 'submarine';
+export type ArmAction = 'long' | 'short';
+export interface ReferenceStyle {
+  /** Pitching only. */
+  arm_slot?: ArmSlot | null;
+  /** Pitching only. */
+  arm_action?: ArmAction | null;
+  /** Free tag, e.g. a batting style. */
+  tag?: string | null;
+}
+
+/** Fields shared by team reference motions and built-in references (src/data/references). */
+export interface ReferenceMotionData {
+  kind: MotionKind;
+  label: string;
+  style: ReferenceStyle;
+  /** Where the motion comes from and under what license / permission. */
+  source_note: string | null;
+  recorded_at: string | null;
+  fps: number;
+  /** Real seconds per media second (slow-motion correction), as in CaptureInfo. */
+  time_scale: number;
+  forward: number;
+  model_version: string;
+  engine_version: string;
+  /** Media-time events, as in MotionAnalysis. */
+  events: EventTimes;
+  metrics: Metrics;
+  quality: { warnings: string[]; meanConfidence?: number; fps?: number };
+  /** Same encoding as MotionAnalysis.keypoints. */
+  keypoints: string;
+}
+
+/** A team's imitation target copied from one motion analysis (docs/DECISIONS.md D22). */
+export interface ReferenceMotion extends BaseRow, ReferenceMotionData {
+  team_id: string | null;
+  /** Who performed it (profiles.id), if known. */
+  player_id: string | null;
+  source_analysis_id: string | null;
+  created_by: string | null;
+}
+
 export interface RowByTable {
   profiles: Profile;
   teams: Team;
@@ -253,6 +297,7 @@ export interface RowByTable {
   games: Game;
   lineups: Lineup;
   game_events: GameEventRow;
+  reference_motions: ReferenceMotion;
 }
 
 /** Columns that exist only on this device and are never synced. */

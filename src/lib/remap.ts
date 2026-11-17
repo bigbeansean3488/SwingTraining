@@ -9,6 +9,7 @@ const DIRECT: [TableName, string][] = [
   ['training_logs', 'player_id'],
   ['motion_analyses', 'player_id'],
   ['lineups', 'pitcher_id'],
+  ['reference_motions', 'player_id'],
 ];
 
 /** Replace every reference to `from` with `to` in a JSON value (ids are unique UUIDs). */
