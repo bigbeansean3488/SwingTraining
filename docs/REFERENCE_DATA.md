@@ -1,0 +1,77 @@
+# 研究樣本參考範圍（D23）
+
+結果頁每個指標下方的「研究樣本 PR」與「常見範圍」，來自公開的實驗室動作捕捉資料。這份文件說明資料來源、計算方法、驗證結果與限制，以及怎麼重新產生。
+
+## 1. 資料來源
+
+- **The OpenBiomechanics Project（OBP）**，Driveline Baseball Research and Development。<https://github.com/drivelineresearch/openbiomechanics>（`dataset-v1` release）
+- 授權：資料與衍生資料為 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)。只可非商業使用，要註明出處，衍生資料要用同樣授權。另外，職業運動組織或金融分析公司的員工、約聘人員或大股東不得使用。
+- 本專案的用法：非商業的球隊訓練工具，在 App 內附出處與授權連結，並註明已轉換資料。衍生檔 `src/analysis/research/obp-ranges.json` 同樣採 CC BY-NC-SA 4.0（見 `src/analysis/research/README.md`）。
+- 使用的檔案：
+  - `pitching_landmarks.zip`、`hitting_landmarks.zip`：每格的 3D 關節中心，360 Hz。
+  - `baseball_pitching/data/metadata.csv`、`poi/poi_metrics.csv`：層級、身高、球速、投球手、出手角度。
+  - `baseball_hitting/data/metadata.csv`、`poi/poi_metrics.csv`：層級、身高、打擊方向、擊球初速。
+- 原始資料放在 `data/obp/`，已列入 `.gitignore`，不提交。
+
+## 2. 計算方法
+
+`scripts/obp/build-trials.mjs`：
+1. 對每一球或每一次揮棒，把 3D 關節中心投影到「正側面」的影像平面：水平軸是踏地瞬間後腳踝指向前腳踝的水平方向，垂直軸是鉛直方向。等於一台理想的正側面攝影機，沒有透視變形，也沒有遮擋。
+2. 對應到 MediaPipe 的關鍵點編號：肩、肘、腕、髖、膝、踝。投球依投球手決定左右。資料裡沒有頭部、腳跟、腳尖，所以需要鼻子的指標（打擊頭部位移）不計算。
+3. 降採樣到 120 fps（每 3 格取 1 格），相當於手機慢動作。
+4. 直接呼叫 App 的分析引擎 `analyze()`，用**自動事件偵測**。手機上的數字也是這樣算的，兩邊的偏差一致才能比較。同時也用 OBP 提供的事件時間再算一次，用來檢查自動偵測的誤差（見 §3）。
+
+`scripts/obp/build-ranges.mjs`：
+1. 每位選手取自己所有成功分析的平均（同一人多次不重複計數）。
+2. 每個指標存 0%、5%……100% 共 21 個分位數，結果頁用線性內插算 PR 值，限制在 1～99。
+3. 「常見範圍」是 P25～P75；P10～P90 以外標為「少見」；兩者之間說「比常見範圍大／小一些」。
+4. 與成績的關聯：每個指標與球速（投球）或擊球初速（打擊）做 Spearman 相關，用 5000 次排列檢定算 p 值。同一類動作的所有指標一起用 Benjamini–Hochberg 控制偽發現率 5%。通過的指標才另外標出「較快的三分之一」選手的 P25～P75。
+5. 職業組（小聯盟＋獨立聯盟）、大學組、出手角度分組：至少 15 人才存。目前畫面只顯示投球的職業組。
+6. 不納入的指標：
+   - `phase_stance_ms`、`phase_release_to_finish_ms`、`phase_follow_ms`：受實驗室影片起訖點影響。
+   - `seq_pelvis_lead_ms`：實驗性。
+
+## 3. 樣本與驗證結果（2026-11-17，引擎 1.1.0）
+
+| | 投球 | 打擊 |
+|---|---|---|
+| 選手 | 99（大學 74、獨立聯盟 12、小聯盟 6、高中 7） | 98（大學 74、高中 12、小聯盟 8、獨立聯盟 4） |
+| 成功分析／全部 | 401／411 | 658／677 |
+| 與成績有關聯的指標 | 出手瞬間軀幹前傾（ρ = 0.30） | 手腕最大速度（ρ = 0.37）、跨步長度（ρ = 0.26） |
+
+自動事件偵測與 OBP 事件時間的差，取中位數（括號內為 10%～90% 範圍），正值代表我們偵測得比較晚：
+
+| 事件 | 差 |
+|---|---|
+| 投球・抬腿最高點 | 0 ms（−3～3） |
+| 投球・前腳著地 | +20 ms（−49～39） |
+| 投球・出手 | −14 ms（−19～−7） |
+| 打擊・前腳著地 | +62 ms（9～129） |
+| 打擊・擊球 | **−61 ms（−69～−53）** |
+
+- 投球跨步：用我們的公式換算成身高百分比，中位數 0.77；OBP 自己算的是 0.84，兩者相關 r = 0.64。差異來自定義不同：我們量腳踝關節中心、投影在側面，OBP 有自己的定義。
+- **打擊的擊球時間系統性提早約 60 毫秒**：引擎用「手腕速度最大」代替擊球瞬間（METRICS §2.1），實驗室資料顯示手腕速度在擊球前約 60 毫秒就達到最大。所以打擊的「前腳著地→擊球」「擊球瞬間前膝角度」「擊球瞬間軀幹傾斜」都是在擊球前一點的姿勢。研究樣本也是用同一套自動偵測算的，所以 PR 值仍然可以比，但跟文獻數字不能直接比。修正方式需要另外決定（會改變指標定義，要調高引擎版本）。
+
+## 4. 限制
+
+- 實驗室資料沒有手機拍攝的雜訊與角度誤差，手機的數字會比樣本分散，極端的 PR 值要保守看待。
+- 樣本以美國大學選手為主；職業組只有投球 18 人，高中組人數不足，不分層級顯示。
+- 投球樣本只有直球；出手角度大多在 30°～50°，側投、下勾的人很少，不能代表這些投法。
+- 關節中心（實驗室模型）與 MediaPipe 關鍵點的位置不完全相同。
+- 與成績有關聯不代表因果，也不代表改變這個指標就會變快。
+- 不做好壞評分、傷害風險或醫療判斷。
+
+## 5. 重新產生
+
+指標公式或事件偵測改變（引擎主版本或次版本更新）後要重新產生，並重新跑測試：
+
+```bash
+gh release download dataset-v1 -R drivelineresearch/openbiomechanics -p pitching_landmarks.zip -p hitting_landmarks.zip -D data/obp
+# 另外下載上面列的 metadata 與 poi CSV 到 data/obp/（檔名把路徑的 / 換成 _），解壓到 data/obp/pitching、data/obp/hitting
+node scripts/obp/build-trials.mjs
+node scripts/obp/build-ranges.mjs
+npx prettier --write src/analysis/research/obp-ranges.json
+npm test
+```
+
+結果頁只在分析的引擎主版本與參考表相同時才顯示研究樣本。

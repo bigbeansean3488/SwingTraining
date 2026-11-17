@@ -17,6 +17,7 @@ import type { MotionAnalysis } from '../../lib/types';
 import { loadVideoElement } from '../../pose/extract';
 import { Badge, Button, Card, LinkButton, Notice, Page } from '../../ui/components';
 import { literatureFor } from './literature';
+import { ReferenceRangeView, ReferenceSampleNote } from './ResearchSample';
 import {
   DISCLAIMER,
   EVENT_LABELS,
@@ -285,6 +286,7 @@ export function ResultPage({ id }: { id: string }) {
             {DISCLAIMER}
           </p>
           <HowToRead />
+          <ReferenceSampleNote kind={row.kind} engineVersion={row.engine_version} />
           {feedback && !feedback.enoughHistory ? (
             <p className="small muted">
               累積 3 次以上的分析後，每個指標會顯示這次落在你自己範圍的哪裡。
@@ -483,6 +485,7 @@ function MetricGroups({
       <MetricCard
         key={k}
         kind={row.kind}
+        engineVersion={row.engine_version}
         metricKey={k}
         value={m.value}
         unit={m.unit}
@@ -552,6 +555,7 @@ function isFiniteNum(v: number | undefined): v is number {
 
 function MetricCard({
   kind,
+  engineVersion,
   metricKey,
   value,
   unit,
@@ -564,6 +568,7 @@ function MetricCard({
   figure,
 }: {
   kind: MotionAnalysis['kind'];
+  engineVersion: string;
   metricKey: string;
   value: number;
   unit: string;
@@ -606,6 +611,14 @@ function MetricCard({
         </p>
       ) : null}
       <RangeBar value={value} past={past} refs={refs} unit={unit} info={info} />
+      <ReferenceRangeView
+        kind={kind}
+        metricKey={metricKey}
+        value={value}
+        unit={unit}
+        engineVersion={engineVersion}
+        info={info}
+      />
       <details>
         <summary>{figure ? '看這個數字量的是哪裡' : '看說明'}</summary>
         {figure}
