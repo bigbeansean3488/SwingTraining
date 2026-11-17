@@ -152,3 +152,26 @@ export async function engineServer() {
     optimizeDeps: { noDiscovery: true, include: [] },
   });
 }
+
+/** Joint mapping for an OBP pitching trial (throwing side from p_throws). */
+export function pitchingJoints(rightHanded) {
+  const T = rightHanded ? R : L; // throwing side
+  const G = rightHanded ? L : R; // glove side (lead leg)
+  return {
+    joints: {
+      [T.SH]: 'shoulder_jc',
+      [T.EL]: 'elbow_jc',
+      [T.WR]: 'wrist_jc',
+      [G.SH]: 'glove_shoulder_jc',
+      [G.EL]: 'glove_elbow_jc',
+      [G.WR]: 'glove_wrist_jc',
+      [T.HIP]: 'rear_hip',
+      [T.KN]: 'rear_knee_jc',
+      [T.AN]: 'rear_ankle_jc',
+      [G.HIP]: 'lead_hip',
+      [G.KN]: 'lead_knee_jc',
+      [G.AN]: 'lead_ankle_jc',
+    },
+    forwardFrom: [T.AN, G.AN],
+  };
+}
