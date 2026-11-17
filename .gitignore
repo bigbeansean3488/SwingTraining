@@ -15,7 +15,8 @@ public/mediapipe/
 *.MOV
 *.mp4
 *.MP4
-data/
+# Root-level raw data only; src/data/ holds bundled, non-personal app data.
+/data/
 backups/
 *.dump
 *.sql.gpg
