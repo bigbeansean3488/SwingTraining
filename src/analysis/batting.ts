@@ -65,8 +65,10 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
   let iC = -1;
   if (iH >= 0 && tC <= tr.t[tr.n - 1]!) iC = indexAt(tr, tC);
   else if (iH >= 0) warnings.push('contact_not_in_clip');
+  // Stride: ankle speed peak before the hands peak; plant must come before contact.
   const iA = argmax(ankle, 0, iH);
-  let iP = iA >= 0 ? firstBelowAfter(ankle, iA, Math.max(0.2 * ankle[iA]!, 0.5), iH) : -1;
+  let iP =
+    iA >= 0 && iC >= 0 ? firstBelowAfter(ankle, iA, Math.max(0.2 * ankle[iA]!, 0.5), iC) : -1;
   let iL = iA >= 0 ? onsetBefore(ankle, iA, Math.max(0.1 * ankle[iA]!, 0.15)) : -1;
   // Right after contact the hands briefly slow down, then speed up again in
   // the follow-through; the finish is when they slow down after that.
