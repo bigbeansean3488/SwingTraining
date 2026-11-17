@@ -21,3 +21,6 @@ backups/
 *.dump
 *.sql.gpg
 .claude/
+
+# Test runner output (vitest --reporter=json)
+.vitest/
