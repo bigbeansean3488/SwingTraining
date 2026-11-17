@@ -36,6 +36,7 @@ const HAS_CREATED_BY = new Set<TableName>([
   'motion_analyses',
   'games',
   'game_events',
+  'reference_motions',
 ]);
 
 export interface RemoteError {
@@ -67,11 +68,18 @@ export interface SyncReport {
   failed: SyncError[];
   /** True when stopped by a network/server problem (will retry). */
   interrupted: boolean;
+  /** Tables the server does not have yet (migration not run); their changes stay queued. */
+  missingTables: TableName[];
 }
 
 const EPOCH = '1970-01-01T00:00:00Z';
 const PAGE = 500;
 const CHUNK = 100;
+
+/** The server has no such table (a newer migration has not been run there yet). */
+export function isMissingTable(e: RemoteError): boolean {
+  return e.code === 'PGRST205' || e.code === '42P01';
+}
 
 /** Errors that will never succeed on retry (permission, constraint, bad data). */
 export function isPermanent(e: RemoteError): boolean {
@@ -94,7 +102,13 @@ export function prepareRow(
 }
 
 export async function syncOnce(remote: Remote): Promise<SyncReport> {
-  const report: SyncReport = { pushed: 0, pulled: 0, failed: [], interrupted: false };
+  const report: SyncReport = {
+    pushed: 0,
+    pulled: 0,
+    failed: [],
+    interrupted: false,
+    missingTables: [],
+  };
   await push(remote, report);
   if (!report.interrupted) await pull(remote, report);
   if (report.failed.length) {
@@ -133,6 +147,11 @@ async function push(remote: Remote, report: SyncReport) {
         await removeOutbox(chunk.flatMap((r) => seqsById.get(r.id)!));
         report.pushed += chunk.length;
         continue;
+      }
+      if (isMissingTable(err)) {
+        // Keep the changes queued until the migration has been run; go on with other tables.
+        if (!report.missingTables.includes(table)) report.missingTables.push(table);
+        break;
       }
       if (!isPermanent(err)) {
         report.interrupted = true;
@@ -183,6 +202,10 @@ async function pull(remote: Remote, report: SyncReport) {
     let cursor = (await getMeta<string>(key)) ?? EPOCH;
     for (;;) {
       const { rows, error } = await remote.pull(table, cursor, PAGE);
+      if (error && isMissingTable(error)) {
+        if (!report.missingTables.includes(table)) report.missingTables.push(table);
+        break;
+      }
       if (error) {
         report.interrupted = true;
         return;
@@ -290,7 +313,9 @@ export function requestSync(): Promise<void> {
             ? '連線中斷，稍後自動重試'
             : r.failed.length
               ? `${r.failed.length} 筆變更被伺服器拒絕`
-              : null,
+              : r.missingTables.length
+                ? `伺服器缺少資料表 ${r.missingTables.join('、')}，請在 Supabase 執行最新的 migration（這些資料先留在手機上）`
+                : null,
         });
       } catch (err) {
         setStatus({ state: 'error', lastError: (err as Error).message });

@@ -10,8 +10,14 @@ function fakeRemote(
   opts: {
     reject?: (table: TableName, row: Record<string, unknown>) => RemoteError | null;
     offline?: boolean;
+    /** Tables the server does not have (migration not run). */
+    missing?: TableName[];
   } = {},
 ) {
+  const missing = (t: TableName): RemoteError | null =>
+    opts.missing?.includes(t)
+      ? { message: `Could not find the table 'public.${t}'`, code: 'PGRST205' }
+      : null;
   const tables = new Map<string, Map<string, Record<string, unknown>>>();
   const calls: string[] = [];
   const uploads: string[] = [];
@@ -20,6 +26,7 @@ function fakeRemote(
     userId: 'user-1',
     async upsert(table, rows) {
       if (opts.offline) return { message: 'Failed to fetch' };
+      if (missing(table)) return missing(table);
       for (const r of rows) {
         const e = opts.reject?.(table, r);
         if (e) return e;
@@ -35,6 +42,7 @@ function fakeRemote(
       return null;
     },
     async pull(table, since, limit) {
+      if (missing(table)) return { rows: [], error: missing(table) };
       const rows = [...(tables.get(table)?.values() ?? [])]
         .filter((r) => (r.server_updated_at as string) > since)
         .sort((a, b) =>
@@ -110,6 +118,43 @@ describe('sync', () => {
     const r = await syncOnce(remote);
     expect(r.failed.map((f) => f.id)).toEqual([bad.id]);
     expect(tables.get('profiles')!.size).toBe(1);
+    expect(await pendingOutbox()).toEqual([]);
+  });
+
+  it('a table missing on the server keeps its changes queued without blocking others', async () => {
+    const team = await saveRow('teams', { name: '成大', created_by: null });
+    const ref = await saveRow('reference_motions', {
+      team_id: team.id,
+      player_id: null,
+      source_analysis_id: null,
+      kind: 'pitching',
+      label: '示範',
+      style: { arm_slot: 'three_quarter' },
+      source_note: null,
+      recorded_at: null,
+      fps: 240,
+      time_scale: 1,
+      forward: 1,
+      model_version: 'm',
+      engine_version: '1.1.0',
+      events: {},
+      metrics: {},
+      quality: { warnings: [] },
+      keypoints: 'gz:',
+      created_by: null,
+    });
+    const old = fakeRemote({ missing: ['reference_motions'] });
+    const r = await syncOnce(old.remote);
+    expect(r.interrupted).toBe(false);
+    expect(r.failed).toEqual([]);
+    expect(r.missingTables).toEqual(['reference_motions']);
+    expect(old.tables.get('teams')!.size).toBe(1);
+    expect((await pendingOutbox()).map((o) => o.table)).toEqual(['reference_motions']);
+    // After the migration has been run, the queued reference goes up.
+    const upgraded = fakeRemote();
+    const r2 = await syncOnce(upgraded.remote);
+    expect(r2.missingTables).toEqual([]);
+    expect(upgraded.tables.get('reference_motions')!.get(ref.id)!.created_by).toBe('user-1');
     expect(await pendingOutbox()).toEqual([]);
   });
 

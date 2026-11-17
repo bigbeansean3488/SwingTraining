@@ -341,6 +341,101 @@ describe('row-level security', () => {
     expect((await as<{ marked_good: boolean }>(U.a, q, [id(400)]))[0]!.marked_good).toBe(false);
   });
 
+  it('reference motions: members read, creator and staff change, others cannot', async () => {
+    const insert = (user: string, rid: string, pid: string | null, team: string | null = T) =>
+      as(
+        user,
+        `insert into reference_motions (id, team_id, player_id, kind, label, style, fps, model_version, engine_version, keypoints, created_by)
+        values ($1, $2, $3, 'pitching', '3/4 示範', '{"arm_slot":"three_quarter"}', 240, 'm', '1.1.0', 'gz:', $4)`,
+        [rid, team, pid, user],
+      );
+    // Player A shares their own motion with the team.
+    await insert(U.a, id(900), P.rosterA);
+    const bProfile = (
+      await as<{ id: string }>(U.b, `select id from profiles where user_id = $1`, [U.b])
+    )[0]!.id;
+    // Teammates and staff read it; outsiders do not.
+    expect((await as(U.b, `select id from reference_motions`)).length).toBe(1);
+    expect((await as(U.coach, `select id from reference_motions`)).length).toBe(1);
+    expect(await as(U.out, `select id from reference_motions`)).toEqual([]);
+    // A player cannot publish a teammate's motion, impersonate a creator or post to another team.
+    expect(
+      await fails(
+        U.b,
+        `insert into reference_motions (id, team_id, player_id, kind, label, fps, model_version, engine_version, keypoints, created_by)
+        values ($1, $2, $3, 'pitching', 'x', 240, 'm', '1.1.0', 'gz:', $4)`,
+        [id(901), T, P.rosterA, U.b],
+      ),
+    ).toBe(true);
+    expect(
+      await fails(
+        U.b,
+        `insert into reference_motions (id, team_id, kind, label, fps, model_version, engine_version, keypoints, created_by)
+        values ($1, $2, 'pitching', 'x', 240, 'm', '1.1.0', 'gz:', $3)`,
+        [id(902), T, U.a],
+      ),
+    ).toBe(true);
+    expect(
+      await fails(
+        U.out,
+        `insert into reference_motions (id, team_id, kind, label, fps, model_version, engine_version, keypoints, created_by)
+        values ($1, $2, 'pitching', 'x', 240, 'm', '1.1.0', 'gz:', $3)`,
+        [id(903), T, U.out],
+      ),
+    ).toBe(true);
+    // Invalid style values are rejected.
+    expect(
+      await fails(
+        U.b,
+        `insert into reference_motions (id, team_id, player_id, kind, label, style, fps, model_version, engine_version, keypoints, created_by)
+        values ($1, $2, $3, 'pitching', 'x', '{"arm_slot":"weird"}', 240, 'm', '1.1.0', 'gz:', $4)`,
+        [id(904), T, bProfile, U.b],
+      ),
+    ).toBe(true);
+    // A teammate cannot rename or tombstone it; creator and coach can.
+    expect(
+      await as(U.b, `update reference_motions set label = 'hack' where id = $1 returning id`, [
+        id(900),
+      ]),
+    ).toEqual([]);
+    expect(
+      (
+        await as(
+          U.a,
+          `update reference_motions set label = '高壓示範', updated_at = '2099-02-01T00:00:00Z' where id = $1 returning id`,
+          [id(900)],
+        )
+      ).length,
+    ).toBe(1);
+    // Coach edits through an upsert, as the sync engine does.
+    await as(
+      U.coach,
+      `insert into reference_motions (id, team_id, player_id, kind, label, fps, model_version, engine_version, keypoints, created_by, updated_at)
+      values ($1, $2, $3, 'pitching', '教練改名', 240, 'm', '1.1.0', 'gz:', $4, '2099-02-02T00:00:00Z')
+      on conflict (id) do update set label = excluded.label, updated_at = excluded.updated_at`,
+      [id(900), T, P.rosterA, U.a],
+    );
+    const [r] = await as<{ label: string }>(U.b, `select label from reference_motions`);
+    expect(r!.label).toBe('教練改名');
+    expect(
+      (
+        await as(
+          U.coach,
+          `update reference_motions set deleted_at = now(), updated_at = '2099-02-03T00:00:00Z' where id = $1 returning id`,
+          [id(900)],
+        )
+      ).length,
+    ).toBe(1);
+    // A team-less reference is private to its creator.
+    await insert(U.b, id(905), bProfile, null);
+    expect(
+      (await as(U.b, `select id from reference_motions where id = $1`, [id(905)])).length,
+    ).toBe(1);
+    expect(await as(U.coach, `select id from reference_motions where id = $1`, [id(905)])).toEqual(
+      [],
+    );
+  });
+
   it('keyframe storage follows player access', async () => {
     await as(
       U.a,

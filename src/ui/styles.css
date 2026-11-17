@@ -916,3 +916,69 @@ table.data td:first-child {
   color: var(--ok);
   border-color: var(--ok);
 }
+
+/* Reference motions (標竿動作) */
+.ref-chips .btn {
+  min-height: 48px;
+}
+.ref-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ref-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ref-option.selected {
+  border-color: var(--brand);
+  background: var(--info-bg);
+}
+.ref-option-title {
+  font-weight: 700;
+}
+.ref-option-sub {
+  color: var(--muted);
+  font-size: 14px;
+}
+.ref-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: #0b0f17;
+}
+.ref-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ref-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.delta-list {
+  margin: 0;
+  padding-left: 20px;
+}
+.delta-list li {
+  margin: 10px 0;
+}
+.tight-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
