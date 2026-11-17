@@ -63,7 +63,11 @@ describe('built-in references', () => {
   it.runIf(process.env.UPDATE_REFERENCE_EXAMPLE === '1')(
     'regenerates the example file',
     async () => {
-      writeFileSync(EXAMPLE, `${JSON.stringify(await buildExample(), null, 1)}\n`);
+      // Written in Prettier's style so `npm run format:check` (CI) passes.
+      const { format, resolveConfig } = await import('prettier');
+      const options = (await resolveConfig(EXAMPLE)) ?? {};
+      const json = JSON.stringify(await buildExample());
+      writeFileSync(EXAMPLE, await format(json, { ...options, filepath: EXAMPLE }));
     },
   );
 
