@@ -250,6 +250,7 @@ export function ResultPage({ id }: { id: string }) {
       {row.quality.ok ? (
         <SummaryCard row={row} references={references} refCount={refRows?.length ?? 0} />
       ) : null}
+      {row.quality.ok ? <ReferenceCard row={row} /> : null}
 
       <Card title="骨架疊圖">
         {seq ? (
@@ -333,6 +334,30 @@ export function ResultPage({ id }: { id: string }) {
         </div>
       </Card>
     </Page>
+  );
+}
+
+/** Entry to the reference-motion (標竿) comparison, and setting this analysis as one. */
+function ReferenceCard({ row }: { row: MotionAnalysis }) {
+  const mine = useRows('reference_motions', (r) => r.source_analysis_id === row.id, [row.id]);
+  return (
+    <Card title="標竿對照">
+      <p style={{ marginTop: 0 }}>
+        把這次動作跟隊上選定的標竿（例如教練或學長的示範）對齊時間與身體比例後並排比較。
+      </p>
+      <div className="stack">
+        <LinkButton to={`/analyze/reference-compare?a=${row.id}`}>與標竿對照</LinkButton>
+        {mine?.length ? (
+          <LinkButton to={`/analyze/references/${mine[0]!.id}`} variant="secondary">
+            已設為標竿「{mine[0]!.label}」（編輯）
+          </LinkButton>
+        ) : (
+          <LinkButton to={`/analyze/references/new?from=${row.id}`} variant="secondary">
+            把這次設為標竿
+          </LinkButton>
+        )}
+      </div>
+    </Card>
   );
 }
 

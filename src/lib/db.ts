@@ -4,7 +4,8 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { TABLES, type BaseRow, type RowByTable, type TableName } from './types';
 
 const DB_NAME = 'team-platform';
-const DB_VERSION = 1;
+// 2: reference_motions store.
+const DB_VERSION = 2;
 
 export interface OutboxItem {
   seq?: number;

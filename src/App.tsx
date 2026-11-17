@@ -27,6 +27,8 @@ import { HomePage } from './features/home/HomePage';
 import { AnalyzeHome } from './features/analyze/AnalyzeHome';
 import { NewAnalysis } from './features/analyze/NewAnalysis';
 import { ResultPage } from './features/analyze/ResultPage';
+import { ReferenceComparePage } from './features/analyze/ReferenceComparePage';
+import { ReferenceForm, ReferenceList } from './features/analyze/ReferencePages';
 import { MetricsGuide } from './features/analyze/MetricsGuide';
 import { ShootingGuide } from './features/analyze/ShootingGuide';
 import { Diagnostics } from './features/analyze/Diagnostics';
@@ -71,6 +73,17 @@ function analyzeRoute(route: Route): ReactNode {
       return <Diagnostics />;
     case 'compare':
       return <ComparePage a={route.query.get('a')} b={route.query.get('b')} />;
+    case 'references': {
+      const id = route.path[2];
+      if (!id) return <ReferenceList />;
+      if (id === 'new')
+        return (
+          <ReferenceForm key={`new-${route.query.get('from')}`} from={route.query.get('from')} />
+        );
+      return <ReferenceForm key={id} id={id} />;
+    }
+    case 'reference-compare':
+      return <ReferenceComparePage a={route.query.get('a')} r={route.query.get('r')} />;
     default:
       return <ResultPage key={sub} id={sub} />;
   }

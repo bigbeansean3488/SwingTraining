@@ -21,6 +21,9 @@ export function AnalyzeHome() {
           並排比較
         </LinkButton>
       </div>
+      <LinkButton to="/analyze/references" variant="secondary">
+        標竿動作（模仿目標）
+      </LinkButton>
       <LinkButton to="/analyze/metrics" variant="secondary">
         指標說明（每個數字代表什麼）
       </LinkButton>
