@@ -1,7 +1,7 @@
 // Reference distributions from the OpenBiomechanics Project (OBP), computed
 // offline by scripts/obp/ with this engine (see docs/REFERENCE_DATA.md).
 // Pure lookups: where a value sits in the research sample. Not a score.
-import data from './reference/obp-ranges.json';
+import data from './research/obp-ranges.json';
 import type { MotionKind } from './types';
 
 export interface GroupRange {

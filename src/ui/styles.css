@@ -816,50 +816,50 @@ table.data td:first-child {
   border: 1px solid var(--muted);
   border-radius: 3px;
 }
-.ref-range {
+.rs-range {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed var(--line);
 }
-.ref-range-head {
+.rs-head {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 6px;
   font-size: 15px;
 }
-.ref-range svg {
+.rs-range svg {
   display: block;
   width: 100%;
   height: auto;
   max-width: 420px;
   margin-top: 6px;
 }
-.ref-usual {
+.rs-usual {
   fill: var(--surface-2);
 }
-.ref-common,
-.range-legend .swatch-ref-common {
+.rs-common,
+.range-legend .swatch-rs-common {
   fill: var(--series-4);
   background: var(--series-4);
   opacity: 0.45;
   border-radius: 3px;
 }
-.ref-fast {
+.rs-fast {
   fill: none;
   stroke: var(--series-2);
   stroke-width: 2.5;
   stroke-dasharray: 5 3;
 }
-.range-legend .swatch-ref-fast {
+.range-legend .swatch-rs-fast {
   border: 2.5px dashed var(--series-2);
   border-radius: 3px;
 }
-.ref-pro {
+.rs-pro {
   stroke: var(--text);
   stroke-width: 3;
   stroke-linecap: round;
 }
-.range-legend .swatch-ref-pro {
+.range-legend .swatch-rs-pro {
   height: 3px !important;
   vertical-align: 3px !important;
   background: var(--text);

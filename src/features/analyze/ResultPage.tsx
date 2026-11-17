@@ -17,7 +17,7 @@ import type { MotionAnalysis } from '../../lib/types';
 import { loadVideoElement } from '../../pose/extract';
 import { Badge, Button, Card, LinkButton, Notice, Page } from '../../ui/components';
 import { literatureFor } from './literature';
-import { ReferenceRangeView, ReferenceSampleNote } from './ReferenceRange';
+import { ReferenceRangeView, ReferenceSampleNote } from './ResearchSample';
 import {
   DISCLAIMER,
   EVENT_LABELS,

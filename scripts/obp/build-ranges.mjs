@@ -2,7 +2,7 @@
 // athlete-level reference distributions for the app.
 //
 // Output (committed, CC BY-NC-SA 4.0 like its source):
-//   src/analysis/reference/obp-ranges.json
+//   src/analysis/research/obp-ranges.json
 //
 // Usage: node scripts/obp/build-ranges.mjs
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const inDir = resolve(root, 'data/obp/out');
-const outFile = resolve(root, 'src/analysis/reference/obp-ranges.json');
+const outFile = resolve(root, 'src/analysis/research/obp-ranges.json');
 
 /**
  * Metrics left out: depend on where the lab clip starts or ends (stance, finish),

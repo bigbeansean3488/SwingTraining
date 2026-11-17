@@ -133,7 +133,7 @@ MediaPipe Pose Landmarker 每幀 33 個關鍵點（影像正規化座標 x、y �
 - **與標記為好的動作比較**（`compareWithReference`）：球員或教練可以把某幾次分析標記為「好的動作」（欄位 `motion_analyses.marked_good`）。本次與這些分析的平均比較，門檻 = max(好動作之間的標準差, 最小差值)；只有一次好動作時只用最小差值。結果頁「重點摘要」列出差值 ÷ 門檻最大的 3 項。比較對象是球員自己的動作，不是外部標準。
 - **量測位置圖**（`src/analysis/figures.ts`）：用與指標相同的濾波、前腳判斷與事件影格，算出角度的三個點或位移的起訖點，畫在關鍵幀上（沒有關鍵幀時畫在骨架上）。單元測試確認從圖上量回的數值等於指標（`figures.test.ts`）。
 - **研究怎麼說**：部分指標附公開文獻的一般觀察與出處（`src/features/analyze/literature.ts`），只寫能在原文摘要或主要整理中查到的內容，並註明不是個人建議（見 DECISIONS D19）。
-- **研究樣本 PR 與參考範圍**（`src/analysis/reference.ts`，2026-11-17 起）：把本次數值放進 OpenBiomechanics Project 研究樣本的分布，算 PR 值（1～99，用 5% 分位數線性內插）與區間：P25～P75「常見範圍」、P10～P90 以外「少見」。樣本用本引擎的自動事件偵測、投影成正側面後計算，每位選手取平均。只有引擎主版本相同時才顯示。方法與限制見 `docs/REFERENCE_DATA.md`（DECISIONS D23）。不是好壞評分。
+- **研究樣本 PR 與參考範圍**（`src/analysis/researchSample.ts`，2026-11-17 起）：把本次數值放進 OpenBiomechanics Project 研究樣本的分布，算 PR 值（1～99，用 5% 分位數線性內插）與區間：P25～P75「常見範圍」、P10～P90 以外「少見」。樣本用本引擎的自動事件偵測、投影成正側面後計算，每位選手取平均。只有引擎主版本相同時才顯示。方法與限制見 `docs/REFERENCE_DATA.md`（DECISIONS D23）。不是好壞評分。
 
 ## 5. 參考文獻
 > 以下為公開發表的生物力學文獻，作為指標選擇與分期定義的依據。引用前請以原文核對細節。

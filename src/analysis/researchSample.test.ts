@@ -7,7 +7,7 @@ import {
   referenceRange,
   referenceSample,
   type ReferenceRange,
-} from './reference';
+} from './researchSample';
 import { generateBatting, generatePitching } from '../../tests/synthetic';
 
 const fake: ReferenceRange = {

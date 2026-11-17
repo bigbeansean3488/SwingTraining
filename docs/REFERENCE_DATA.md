@@ -6,7 +6,7 @@
 
 - **The OpenBiomechanics Project（OBP）**，Driveline Baseball Research and Development。<https://github.com/drivelineresearch/openbiomechanics>（`dataset-v1` release）
 - 授權：資料與衍生資料為 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)。只可非商業使用，要註明出處，衍生資料要用同樣授權。另外，職業運動組織或金融分析公司的員工、約聘人員或大股東不得使用。
-- 本專案的用法：非商業的球隊訓練工具，在 App 內附出處與授權連結，並註明已轉換資料。衍生檔 `src/analysis/reference/obp-ranges.json` 同樣採 CC BY-NC-SA 4.0（見 `src/analysis/reference/README.md`）。
+- 本專案的用法：非商業的球隊訓練工具，在 App 內附出處與授權連結，並註明已轉換資料。衍生檔 `src/analysis/research/obp-ranges.json` 同樣採 CC BY-NC-SA 4.0（見 `src/analysis/research/README.md`）。
 - 使用的檔案：
   - `pitching_landmarks.zip`、`hitting_landmarks.zip`：每格的 3D 關節中心，360 Hz。
   - `baseball_pitching/data/metadata.csv`、`poi/poi_metrics.csv`：層級、身高、球速、投球手、出手角度。
@@ -70,7 +70,7 @@ gh release download dataset-v1 -R drivelineresearch/openbiomechanics -p pitching
 # 另外下載上面列的 metadata 與 poi CSV 到 data/obp/（檔名把路徑的 / 換成 _），解壓到 data/obp/pitching、data/obp/hitting
 node scripts/obp/build-trials.mjs
 node scripts/obp/build-ranges.mjs
-npx prettier --write src/analysis/reference/obp-ranges.json
+npx prettier --write src/analysis/research/obp-ranges.json
 npm test
 ```
 

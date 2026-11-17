@@ -8,7 +8,7 @@ import {
   referenceRange,
   referenceSample,
   type ReferenceBand,
-} from '../../analysis/reference';
+} from '../../analysis/researchSample';
 import type { MotionKind } from '../../analysis/types';
 import { formatMetric, type MetricInfo } from './metricInfo';
 
@@ -70,8 +70,8 @@ export function ReferenceRangeView({
   const H = pro ? 52 : 40;
 
   return (
-    <div className="ref-range">
-      <div className="ref-range-head">
+    <div className="rs-range">
+      <div className="rs-head">
         <span>
           研究樣本 <strong>PR {pr}</strong>
         </span>
@@ -85,7 +85,7 @@ export function ReferenceRangeView({
           width={Math.max(2, sx(r.usual[1]) - sx(r.usual[0]))}
           height={8}
           rx={3}
-          className="ref-usual"
+          className="rs-usual"
         >
           <title>{`樣本中間 80%：${fmt(r.usual[0])}～${fmt(r.usual[1])}`}</title>
         </rect>
@@ -95,7 +95,7 @@ export function ReferenceRangeView({
           width={Math.max(2, sx(r.common[1]) - sx(r.common[0]))}
           height={14}
           rx={4}
-          className="ref-common"
+          className="rs-common"
         >
           <title>{`常見範圍（中間 50%）：${fmt(r.common[0])}～${fmt(r.common[1])}`}</title>
         </rect>
@@ -106,7 +106,7 @@ export function ReferenceRangeView({
             width={Math.max(2, sx(r.highOutcome.p75) - sx(r.highOutcome.p25))}
             height={20}
             rx={5}
-            className="ref-fast"
+            className="rs-fast"
           >
             <title>{`${WHO[kind].fast}：${fmt(r.highOutcome.p25)}～${fmt(r.highOutcome.p75)}`}</title>
           </rect>
@@ -116,8 +116,8 @@ export function ReferenceRangeView({
         </circle>
         {pro ? (
           <g>
-            <line x1={sx(pro.p25)} x2={sx(pro.p75)} y1={y + 22} y2={y + 22} className="ref-pro" />
-            <line x1={sx(pro.p50)} x2={sx(pro.p50)} y1={y + 17} y2={y + 27} className="ref-pro" />
+            <line x1={sx(pro.p25)} x2={sx(pro.p75)} y1={y + 22} y2={y + 22} className="rs-pro" />
+            <line x1={sx(pro.p50)} x2={sx(pro.p50)} y1={y + 17} y2={y + 27} className="rs-pro" />
             <title>{`小聯盟＋獨立聯盟投手（${pro.n} 人）中間 50%：${fmt(pro.p25)}～${fmt(pro.p75)}`}</title>
           </g>
         ) : null}
@@ -141,18 +141,18 @@ export function ReferenceRangeView({
       </svg>
       <div className="range-legend small">
         <span>
-          <i className="swatch-ref-common" />
+          <i className="swatch-rs-common" />
           常見範圍 {fmt(r.common[0])}～{fmt(r.common[1])}
         </span>
         {r.highOutcome ? (
           <span>
-            <i className="swatch-ref-fast" />
+            <i className="swatch-rs-fast" />
             {WHO[kind].fast} {fmt(r.highOutcome.p25)}～{fmt(r.highOutcome.p75)}
           </span>
         ) : null}
         {pro ? (
           <span>
-            <i className="swatch-ref-pro" />
+            <i className="swatch-rs-pro" />
             職業（小聯盟＋獨立聯盟，{pro.n} 人）{fmt(pro.p25)}～{fmt(pro.p75)}
           </span>
         ) : null}
