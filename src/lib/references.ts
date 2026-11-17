@@ -161,7 +161,16 @@ export function rowToEntry(r: ReferenceMotion): ReferenceEntry {
   };
 }
 
-const loaders = import.meta.glob('../data/references/*.json', { import: 'default' });
+// Files named demo-*.json are synthetic samples for development: they are only
+// bundled in dev/test builds (the branch is removed from production builds).
+const loaders = {
+  ...import.meta.glob(['../data/references/*.json', '!../data/references/demo-*.json'], {
+    import: 'default',
+  }),
+  ...(import.meta.env.DEV
+    ? import.meta.glob('../data/references/demo-*.json', { import: 'default' })
+    : {}),
+};
 
 let builtinCache: Promise<BuiltinReferenceFile[]> | null = null;
 

@@ -134,6 +134,7 @@ export function ReferenceComparePage({ a, r }: { a: string | null; r: string | n
                   type="button"
                   role="radio"
                   aria-checked={e.id === selected?.id}
+                  aria-label={e.label}
                   className={`ref-option ${e.id === selected?.id ? 'selected' : ''}`}
                   onClick={() => pick(e.id)}
                 >
@@ -479,7 +480,7 @@ function drawCompare(
   const panels = mode === 'side' ? 2 : 1;
   const W = 720;
   // Height from the figure's aspect ratio, capped so the canvas fits a phone screen.
-  const H = Math.round(Math.min(900, Math.max(360, (W / panels) * (bh / bw))));
+  const H = Math.round(Math.min(900, Math.max(panels === 2 ? 520 : 360, (W / panels) * (bh / bw))));
   if (c.width !== W) c.width = W;
   if (c.height !== H) c.height = H;
   const ctx = c.getContext('2d');
@@ -512,14 +513,14 @@ function drawCompare(
     pelvisMark(1);
     drawPose(ctx, you, map(0), YOU_COLOR, lw);
     drawPose(ctx, ref, map(1), REF_COLOR, lw);
-    label(ctx, '你', 12, 26, YOU_COLOR);
-    label(ctx, '標竿', pw + 12, 26, REF_COLOR);
+    label(ctx, '你', 16, 48, YOU_COLOR);
+    label(ctx, '標竿', pw + 16, 48, REF_COLOR);
   } else {
     pelvisMark(0);
     drawPose(ctx, ref, map(0), REF_COLOR, lw * 1.6, 0.75);
     drawPose(ctx, you, map(0), YOU_COLOR, lw);
   }
-  if (!you || !ref) label(ctx, '這個時間點有一邊追蹤不到骨盆', 12, H - 14, '#ffffff');
+  if (!you || !ref) label(ctx, '有一邊這時追蹤不到骨盆', 16, H - 20, '#ffffff');
 }
 
 function drawPose(
@@ -559,7 +560,8 @@ function drawPose(
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string) {
-  ctx.font = 'bold 22px system-ui, sans-serif';
+  // The 720-px canvas is shown about 300 CSS px wide on a phone: keep text large.
+  ctx.font = 'bold 40px system-ui, sans-serif';
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
 }

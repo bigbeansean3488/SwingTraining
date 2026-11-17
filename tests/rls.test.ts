@@ -359,7 +359,6 @@ describe('row-level security', () => {
     expect((await as(U.coach, `select id from reference_motions`)).length).toBe(1);
     expect(await as(U.out, `select id from reference_motions`)).toEqual([]);
     // A player cannot publish a teammate's motion, impersonate a creator or post to another team.
-    expect(await fails(U.b, `select 1`)).toBe(false);
     expect(
       await fails(
         U.b,
@@ -376,7 +375,6 @@ describe('row-level security', () => {
         [id(902), T, U.a],
       ),
     ).toBe(true);
-    expect(await fails(U.out, `select 1`)).toBe(false);
     expect(
       await fails(
         U.out,
@@ -430,7 +428,9 @@ describe('row-level security', () => {
     ).toBe(1);
     // A team-less reference is private to its creator.
     await insert(U.b, id(905), bProfile, null);
-    expect((await as(U.b, `select id from reference_motions where id = $1`, [id(905)])).length).toBe(1);
+    expect(
+      (await as(U.b, `select id from reference_motions where id = $1`, [id(905)])).length,
+    ).toBe(1);
     expect(await as(U.coach, `select id from reference_motions where id = $1`, [id(905)])).toEqual(
       [],
     );

@@ -273,7 +273,9 @@ export function ReferenceList() {
                   subtitle={[name(e.player_id), ...styleLabels(e.style)].filter(Boolean).join('・')}
                   right={
                     canEditReference(access, session?.user.id ?? null, e) ? (
-                      <span className="chev">編輯 ›</span>
+                      <span className="small" style={{ color: 'var(--brand)', fontWeight: 700 }}>
+                        編輯 ›
+                      </span>
                     ) : (
                       <Badge>隊上</Badge>
                     )
