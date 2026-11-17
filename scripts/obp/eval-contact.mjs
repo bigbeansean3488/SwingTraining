@@ -37,6 +37,10 @@ try {
   const signal = await server.ssrLoadModule('/src/analysis/signal.ts');
   const geom = await server.ssrLoadModule('/src/analysis/geometry.ts');
   const qmod = await server.ssrLoadModule('/src/analysis/quality.ts');
+  const { analyze } = await server.ssrLoadModule('/src/analysis/index.ts');
+  // Engine contact frame vs lab contact, with frames shifted against the
+  // events so they do not line up with contact.
+  const frameStats = CONDITIONS.map(() => ({ before: 0, n: 0, err: [] }));
 
   const meta = new Map(
     readCsv(resolve(dataDir, 'baseball_hitting_data_metadata.csv')).map((r) => [
@@ -56,6 +60,22 @@ try {
     if (!m) continue;
     const { joints, forwardFrom } = hittingJoints(m.hitter_side === 'R');
     CONDITIONS.forEach((cond, ci) => {
+      const shift = (k * 7) % Math.max(1, Math.round(360 / cond.fps));
+      const shifted = toSequence(
+        head,
+        rows.slice(shift),
+        joints,
+        forwardFrom,
+        { plant: 'fp_10_time', contact: 'contact_time' },
+        { ...cond, seed: k },
+      );
+      const ra = analyze('batting', shifted.seq);
+      if (Number.isFinite(shifted.events.contact) && Number.isFinite(ra.events.contact)) {
+        const fsx = frameStats[ci];
+        fsx.n++;
+        if (ra.events.contact < shifted.events.contact - 1e-9) fsx.before++;
+        fsx.err.push((ra.events.contact - shifted.events.contact) * 1000);
+      }
       const { seq, events } = toSequence(
         head,
         rows,
@@ -127,6 +147,14 @@ try {
   CONDITIONS.forEach((c, ci) => {
     console.log(`\n== ${c.fps} fps, noise ${c.noisePx}px  (ms, + = later than lab contact)`);
     for (const [name, a] of Object.entries(results[ci])) console.log(name.padEnd(22), fmt(a));
+  });
+  console.log('\n== engine contact frame (analyze())');
+  CONDITIONS.forEach((c, ci) => {
+    const f = frameStats[ci];
+    console.log(
+      `${c.fps} fps noise ${c.noisePx}px: frame before lab contact ${((100 * f.before) / f.n).toFixed(0)}%,`,
+      fmt(f.err),
+    );
   });
   console.log('\n== features at lab contact (120 fps, no noise)');
   for (const f of Object.keys(features[0])) {

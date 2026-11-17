@@ -30,6 +30,8 @@ export interface SynthOptions {
   stride?: number;
   /** Multiply all event times (tempo change). */
   tempo?: number;
+  /** Batting: time of the first frame (s), to shift frames against the events. */
+  phase?: number;
   /**
    * Pitching: how far (torso units) the rear foot swings forward after
    * release. Real pitchers often swing it past the stride foot.
@@ -260,7 +262,7 @@ export function generateBatting(opts: SynthOptions): SynthSequence {
   const n = Math.round(1.6 * tempo * opts.fps);
   const frames: SynthFrame[] = [];
   for (let i = 0; i < n; i++) {
-    const t = i / opts.fps;
+    const t = (opts.phase ?? 0) + i / opts.fps;
     frames.push({
       t: Math.round(t * 1e6) / 1e6,
       lm: swapLegs(

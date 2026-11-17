@@ -7,7 +7,7 @@ import type { MotionKind } from './types';
  * is bumped for a change that affects that kind.
  */
 export const DEFINITION_CHANGES: Record<MotionKind, readonly string[]> = {
-  batting: ['1.0.0', '1.1.0', '1.2.0'],
+  batting: ['1.0.0', '1.1.0', '1.2.0', '1.3.0'],
   pitching: ['1.0.0', '1.1.0'],
 };
 

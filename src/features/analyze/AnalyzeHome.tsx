@@ -1,3 +1,5 @@
+import { analysisTimes, formatDateTime } from '../../lib/analysisTime';
+import type { MotionAnalysis } from '../../lib/types';
 import { useRows } from '../../lib/hooks';
 import { Badge, Card, Empty, LinkButton, ListLink, Page } from '../../ui/components';
 import { KIND_LABEL } from './metricInfo';
@@ -39,7 +41,7 @@ export function AnalyzeHome() {
                 key={a.id}
                 to={`/analyze/${a.id}`}
                 title={`${a.marked_good ? '★ ' : ''}${KIND_LABEL[a.kind]}・${name(a.player_id)}`}
-                subtitle={`${new Date(a.recorded_at).toLocaleString('zh-TW')}・${a.fps.toFixed(0)} fps`}
+                subtitle={listTimes(a)}
                 right={
                   a.quality.ok ? <Badge kind="ok">完成</Badge> : <Badge kind="error">需重拍</Badge>
                 }
@@ -53,4 +55,10 @@ export function AnalyzeHome() {
       </LinkButton>
     </Page>
   );
+}
+
+function listTimes(a: MotionAnalysis): string {
+  const t = analysisTimes(a);
+  const filmed = t.filmedSource === 'video' && t.filmed ? `拍攝 ${formatDateTime(t.filmed)}・` : '';
+  return `${filmed}分析 ${formatDateTime(t.analyzed)}・${a.fps.toFixed(0)} fps`;
 }

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeBatting, CONTACT_AFTER_HAND_PEAK_S } from './batting';
+import { analyzeBatting, CONTACT_DELAY_MAX_S, contactDelay } from './batting';
 import { firstBelowAfter, handSpeed } from './common';
 import { angleAt, leanFromVertical } from './geometry';
 import { argmax } from './signal';
 import { buildTracks } from './tracks';
 import { loadFixture } from '../../tests/fixtures';
-import { battingPose, battingTruth, SYNTH_TORSO_PX } from '../../tests/synthetic';
+import { battingPose, battingTruth, generateBatting, SYNTH_TORSO_PX } from '../../tests/synthetic';
 import type { PoseSequence } from './types';
 
 const T = SYNTH_TORSO_PX;
@@ -131,8 +131,16 @@ describe('analyzeBatting on synthetic fixtures', () => {
 
   it('places contact after the hand-speed peak, not at it', () => {
     const r = analyzeBatting(loadFixture('batting-240fps').seq);
-    const bt = battingTruth(1);
-    expect(r.events.contact! - bt.handPeak).toBeCloseTo(CONTACT_AFTER_HAND_PEAK_S, 2);
+    const dt = r.events.contact! - battingTruth(1).handPeak;
+    expect(dt).toBeGreaterThanOrEqual(contactDelay(240) - 0.002);
+    expect(dt).toBeLessThan(contactDelay(240) + 1 / 240 + 0.002);
+  });
+
+  it('shortens the delay at low frame rates, where rounding up adds part of a frame', () => {
+    expect(contactDelay(240)).toBeGreaterThan(contactDelay(30));
+    expect(contactDelay(30)).toBeCloseTo(0.064, 3);
+    expect(contactDelay(24)).toBeCloseTo(0.06275, 4);
+    expect(contactDelay(1000)).toBeLessThanOrEqual(CONTACT_DELAY_MAX_S);
   });
 
   it('finds the finish after the follow-through, not at the dip right after contact', () => {
@@ -147,6 +155,16 @@ describe('analyzeBatting on synthetic fixtures', () => {
     expect(oldFinish - ev.contact).toBeLessThan(0.1);
     expect(r.events.finish! - ev.contact).toBeGreaterThan(0.15);
     expect(Math.abs(r.events.finish! - ev.finish)).toBeLessThan(0.02);
+  });
+
+  it('the contact frame is not before contact, whatever the frame phase (30 fps)', () => {
+    const ev = battingTruth(1).events;
+    for (let k = 0; k < 6; k++) {
+      const r = analyzeBatting(generateBatting({ fps: 30, phase: k / 180 }));
+      expect(r.failure).toBeUndefined();
+      expect(r.events.contact!).toBeGreaterThanOrEqual(ev.contact);
+      expect(r.events.contact! - ev.contact).toBeLessThan(1 / 30 + 0.012);
+    }
   });
 
   it('reports a clip that ends before contact', () => {

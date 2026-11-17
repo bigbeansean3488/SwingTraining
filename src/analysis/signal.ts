@@ -47,6 +47,22 @@ export function argmax(xs: readonly number[], from = 0, to = xs.length - 1): num
   return best;
 }
 
+/**
+ * Time of the peak at index `i`, refined between samples by fitting a
+ * parabola through it and its two neighbors. Falls back to t[i].
+ */
+export function subSamplePeakTime(t: readonly number[], xs: readonly number[], i: number): number {
+  const a = xs[i - 1];
+  const b = xs[i];
+  const c = xs[i + 1];
+  const ti = t[i]!;
+  if (!isNum(a) || !isNum(b) || !isNum(c) || i + 1 >= t.length) return ti;
+  const d = a + c - 2 * b;
+  if (!(d < 0)) return ti;
+  const offset = Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / d));
+  return ti + offset * (t[i + 1]! - ti);
+}
+
 export function argmin(xs: readonly number[], from = 0, to = xs.length - 1): number {
   return argmax(
     xs.map((v) => -v),
