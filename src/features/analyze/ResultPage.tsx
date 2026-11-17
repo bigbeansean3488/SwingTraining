@@ -8,6 +8,7 @@ import {
 } from '../../analysis/feedback';
 import { metricFigures, type FigureSet } from '../../analysis/figures';
 import type { EventTimes, PoseSequence } from '../../analysis/types';
+import { sameDefinitions } from '../../analysis/versions';
 import { unpackKeypoints } from '../../lib/compress';
 import { deleteBlob, deleteRow, getBlob, updateRow } from '../../lib/db';
 import { downloadText } from '../../lib/download';
@@ -56,7 +57,7 @@ export function ResultPage({ id }: { id: string }) {
       r.player_id === row.player_id &&
       r.kind === row.kind &&
       r.quality.ok &&
-      r.engine_version.split('.')[0] === row.engine_version.split('.')[0] &&
+      sameDefinitions(row.kind, r.engine_version, row.engine_version) &&
       r.recorded_at <= row.recorded_at,
     [row?.id, row?.player_id, row?.kind, row?.recorded_at, row?.engine_version],
   );
@@ -71,7 +72,7 @@ export function ResultPage({ id }: { id: string }) {
       r.kind === row.kind &&
       r.quality.ok &&
       !!r.marked_good &&
-      r.engine_version.split('.')[0] === row.engine_version.split('.')[0],
+      sameDefinitions(row.kind, r.engine_version, row.engine_version),
     [row?.id, row?.player_id, row?.kind, row?.engine_version],
   );
   const keyframeUrls = useKeyframeUrls(row?.keyframes);

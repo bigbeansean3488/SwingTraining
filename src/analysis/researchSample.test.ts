@@ -46,8 +46,11 @@ describe('reference lookups', () => {
     expect(referenceBand(fake, 95)).toBe('rare_high');
   });
 
-  it('refuses samples built by another engine major version', () => {
+  it('refuses samples built with other metric definitions', () => {
     expect(referenceSample('pitching', ENGINE_VERSION)).not.toBeNull();
+    // Batting contact moved in 1.2.0; pitching did not change.
+    expect(referenceSample('batting', '1.1.0')).toBeNull();
+    expect(referenceSample('pitching', '1.1.0')).not.toBeNull();
     expect(referenceSample('pitching', '0.9.0')).toBeNull();
     expect(referenceRange('batting', 'stride_length', '99.0.0')).toBeNull();
   });

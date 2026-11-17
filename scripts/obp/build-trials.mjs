@@ -6,114 +6,45 @@
 // Output (not committed): data/obp/out/{pitching,hitting}_trials.json
 //
 // Usage: node scripts/obp/build-trials.mjs [--fps 120]
-import { createReadStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { createServer } from 'vite';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  L,
+  R,
+  dataDir,
+  engineServer,
+  hittingJoints,
+  readCsv,
+  toSequence as toSeq,
+  trials,
+} from './lib.mjs';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const dataDir = resolve(root, 'data/obp');
 const outDir = resolve(dataDir, 'out');
 const argFps = process.argv.indexOf('--fps');
 const TARGET_FPS = argFps > 0 ? Number(process.argv[argFps + 1]) : 120;
-const PX_PER_M = 400;
-const WIDTH = 1600;
-const HEIGHT = 1000;
-
-// MediaPipe indices (src/analysis/landmarks.ts).
-const L = { SH: 11, EL: 13, WR: 15, HIP: 23, KN: 25, AN: 27 };
-const R = { SH: 12, EL: 14, WR: 16, HIP: 24, KN: 26, AN: 28 };
-
-function readCsv(path) {
-  const lines = readFileSync(path, 'utf8').trim().split(/\r?\n/);
-  const head = lines[0].split(',');
-  return lines.slice(1).map((l) => {
-    const c = l.split(',');
-    return Object.fromEntries(head.map((h, i) => [h, c[i]]));
-  });
-}
-
-/** Streams landmarks.csv and yields one { key, head, rows } per trial. */
-async function* trials(path, keyCol) {
-  const rl = createInterface({ input: createReadStream(path), crlfDelay: Infinity });
-  let head = null;
-  let cur = null;
-  let rows = [];
-  for await (const line of rl) {
-    if (!head) {
-      head = line.split(',');
-      continue;
-    }
-    const c = line.split(',');
-    const key = c[head.indexOf(keyCol)];
-    if (key !== cur) {
-      if (cur) yield { key: cur, head, rows };
-      cur = key;
-      rows = [];
-    }
-    rows.push(c.map(Number));
-  }
-  if (cur) yield { key: cur, head, rows };
-}
+const toSequence = (head, rows, joints, forwardFrom, eventCols) =>
+  toSeq(head, rows, joints, forwardFrom, eventCols, { fps: TARGET_FPS });
 
 /**
- * Builds a PoseSequence from 3D joint centers. `joints` maps a MediaPipe index
- * to a column prefix (`<prefix>_x/_y/_z`). The image plane is spanned by the
- * horizontal motion direction (image right) and the vertical axis (z up).
+ * Bat finish from the lab bat marker: after the bat-speed peak (contact), the
+ * first time the sweet-spot speed falls below 20% of that peak. Null if the
+ * clip ends first. Used only to check the hand-based finish rule.
  */
-function toSequence(head, rows, joints, forwardFrom, eventCols) {
-  const col = (name) => head.indexOf(name);
-  const tCol = col('time');
-  const idx = Object.fromEntries(
-    Object.entries(joints).map(([k, p]) => [k, [col(`${p}_x`), col(`${p}_y`), col(`${p}_z`)]]),
-  );
-  for (const [k, ix] of Object.entries(idx)) {
-    if (ix.some((i) => i < 0)) throw new Error(`missing column for ${k}: ${joints[k]}`);
+function batFinish(head, rows) {
+  const c = (n) => head.indexOf(n);
+  const [ti, sx, sy, sz] = [c('time'), c('sweet_spot_x'), c('sweet_spot_y'), c('sweet_spot_z')];
+  if ([sx, sy, sz].some((i) => i < 0)) return null;
+  const v = [];
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1];
+    const b = rows[i];
+    const s = Math.hypot(b[sx] - a[sx], b[sy] - a[sy], b[sz] - a[sz]) / (b[ti] - a[ti]);
+    v.push({ t: b[ti], s: Number.isFinite(s) ? s : 0 });
   }
-  const events = Object.fromEntries(
-    Object.entries(eventCols).map(([name, c]) => [name, rows[0][col(c)]]),
-  );
-  // Forward = horizontal direction from rear to lead ankle at foot plant.
-  const tPlant = events.plant;
-  const iPlant = Math.max(
-    0,
-    rows.findIndex((r) => r[tCol] >= tPlant),
-  );
-  const [rear, lead] = forwardFrom;
-  const a = idx[rear];
-  const b = idx[lead];
-  const fr = rows[iPlant];
-  let fx = fr[b[0]] - fr[a[0]];
-  let fy = fr[b[1]] - fr[a[1]];
-  const fn = Math.hypot(fx, fy);
-  fx /= fn;
-  fy /= fn;
-
-  const srcFps = 1 / (rows[1][tCol] - rows[0][tCol]);
-  const step = Math.max(1, Math.round(srcFps / TARGET_FPS));
-  // Centre the motion horizontally.
-  const xs = rows.map((r) => r[idx[lead][0]] * fx + r[idx[lead][1]] * fy);
-  const x0 = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const frames = [];
-  for (let i = 0; i < rows.length; i += step) {
-    const r = rows[i];
-    if (Object.values(idx).some((ix) => ix.some((j) => !Number.isFinite(r[j])))) {
-      frames.push({ t: r[tCol], lm: null });
-      continue;
-    }
-    const lm = Array.from({ length: 33 }, () => ({ x: 0, y: 0, v: 0 }));
-    for (const [k, ix] of Object.entries(idx)) {
-      const h = r[ix[0]] * fx + r[ix[1]] * fy - x0;
-      lm[Number(k)] = {
-        x: (WIDTH / 2 + h * PX_PER_M) / WIDTH,
-        y: (HEIGHT - 50 - r[ix[2]] * PX_PER_M) / HEIGHT,
-        v: 0.99,
-      };
-    }
-    frames.push({ t: r[tCol], lm });
-  }
-  return { seq: { width: WIDTH, height: HEIGHT, frames }, events, srcFps };
+  let iPk = 0;
+  for (let i = 1; i < v.length; i++) if (v[i].s > v[iPk].s) iPk = i;
+  const j = v.findIndex((x, i) => i > iPk && x.s < 0.2 * v[iPk].s);
+  return j > 0 ? v[j].t : null;
 }
 
 function torso3d(head, rows, sh, hip) {
@@ -134,14 +65,7 @@ const pick = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.v
 
 async function main() {
   mkdirSync(outDir, { recursive: true });
-  const server = await createServer({
-    root,
-    configFile: false,
-    logLevel: 'error',
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-    optimizeDeps: { noDiscovery: true, include: [] },
-  });
+  const server = await engineServer();
   try {
     const { analyze, ENGINE_VERSION } = await server.ssrLoadModule('/src/analysis/index.ts');
 
@@ -240,25 +164,8 @@ async function main() {
     )) {
       const meta = hMeta.get(key);
       if (!meta) continue;
-      const rightHanded = meta.hitter_side === 'R';
-      const joints = {
-        [L.SH]: 'lsjc',
-        [L.EL]: 'lejc',
-        [L.WR]: 'lwjc',
-        [L.HIP]: 'left_hip',
-        [L.KN]: 'lkjc',
-        [L.AN]: 'lajc',
-        [R.SH]: 'rsjc',
-        [R.EL]: 'rejc',
-        [R.WR]: 'rwjc',
-        [R.HIP]: 'right_hip',
-        [R.KN]: 'rkjc',
-        [R.AN]: 'rajc',
-      };
-      // Right-handed hitter: lead (front) leg is the left one.
-      const rearAn = rightHanded ? R.AN : L.AN;
-      const leadAn = rightHanded ? L.AN : R.AN;
-      const { seq, events } = toSequence(head, rows, joints, [rearAn, leadAn], {
+      const { joints, forwardFrom } = hittingJoints(meta.hitter_side === 'R');
+      const { seq, events } = toSequence(head, rows, joints, forwardFrom, {
         plant: 'fp_10_time',
         contact: 'contact_time',
       });
@@ -275,6 +182,7 @@ async function main() {
         batSpeed: Number(meta.bat_speed_mph_max_x),
         torso3dM: torso3d(head, rows, ['lsjc', 'rsjc'], ['left_hip', 'right_hip']),
         obpEvents: events,
+        batFinish: batFinish(head, rows),
         autoEvents: auto.events,
         autoFailure: auto.failure ?? null,
         failure: manual.failure ?? null,

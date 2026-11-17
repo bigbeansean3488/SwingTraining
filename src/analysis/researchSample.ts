@@ -3,6 +3,7 @@
 // Pure lookups: where a value sits in the research sample. Not a score.
 import data from './research/obp-ranges.json';
 import type { MotionKind } from './types';
+import { sameDefinitions } from './versions';
 
 export interface GroupRange {
   n: number;
@@ -53,12 +54,13 @@ const table = data as unknown as {
 
 export const REFERENCE_SOURCE: ReferenceSource = table.source;
 
-const major = (v: string) => v.split('.')[0];
-
-/** The research sample for a motion kind, or null if built by another engine major. */
+/**
+ * The research sample for a motion kind, or null if it was built with
+ * different metric definitions than `engineVersion` (see versions.ts).
+ */
 export function referenceSample(kind: MotionKind, engineVersion: string): ReferenceSample | null {
   const s = table[kind];
-  return s && major(s.engineVersion) === major(engineVersion) ? s : null;
+  return s && sameDefinitions(kind, s.engineVersion, engineVersion) ? s : null;
 }
 
 export function referenceRange(

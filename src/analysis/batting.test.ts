@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeBatting } from './batting';
+import { analyzeBatting, CONTACT_AFTER_HAND_PEAK_S } from './batting';
+import { firstBelowAfter, handSpeed } from './common';
 import { angleAt, leanFromVertical } from './geometry';
+import { argmax } from './signal';
+import { buildTracks } from './tracks';
 import { loadFixture } from '../../tests/fixtures';
 import { battingPose, battingTruth, SYNTH_TORSO_PX } from '../../tests/synthetic';
 import type { PoseSequence } from './types';
@@ -47,7 +50,8 @@ describe('analyzeBatting on synthetic fixtures', () => {
       const s = params.forward ?? 1;
       const r = analyzeBatting(seq);
       const truth = truthMetrics(s);
-      const ev = battingTruth(s).events;
+      const bt = battingTruth(s);
+      const ev = bt.events;
 
       it('passes quality control and finds the direction', () => {
         expect(r.failure).toBeUndefined();
@@ -79,7 +83,7 @@ describe('analyzeBatting on synthetic fixtures', () => {
         const v = r.metrics.wrist_peak_speed!.value;
         expect(Math.abs(v - truth.peakSpeed) / truth.peakSpeed).toBeLessThan(c.speedTol);
         const tPeak = r.metrics.wrist_peak_time_ms!.value;
-        expect(Math.abs(tPeak - (ev.contact - ev.plant) * 1000)).toBeLessThan(c.evTol * 1000 * 2);
+        expect(Math.abs(tPeak - (bt.handPeak - ev.plant) * 1000)).toBeLessThan(c.evTol * 1000 * 2);
       });
       it('phase durations add up to the event times', () => {
         const sum = r.metrics.phase_load_ms!.value + r.metrics.phase_plant_to_contact_ms!.value;
@@ -123,6 +127,34 @@ describe('analyzeBatting on synthetic fixtures', () => {
     expect(b.stride_length!.value).toBeCloseTo(a.stride_length!.value, 2);
     expect(b.lead_knee_plant!.value).toBeCloseTo(a.lead_knee_plant!.value, 0);
     expect(b.wrist_peak_speed!.value).toBeCloseTo(a.wrist_peak_speed!.value, 1);
+  });
+
+  it('places contact after the hand-speed peak, not at it', () => {
+    const r = analyzeBatting(loadFixture('batting-240fps').seq);
+    const bt = battingTruth(1);
+    expect(r.events.contact! - bt.handPeak).toBeCloseTo(CONTACT_AFTER_HAND_PEAK_S, 2);
+  });
+
+  it('finds the finish after the follow-through, not at the dip right after contact', () => {
+    const { seq } = loadFixture('batting-240fps');
+    const r = analyzeBatting(seq);
+    const ev = battingTruth(1).events;
+    // The old rule (first drop below 25% of the peak) stopped at the dip.
+    const tr = buildTracks(seq, 12, 20);
+    const hands = handSpeed(tr);
+    const iH = argmax(hands);
+    const oldFinish = tr.t[firstBelowAfter(hands, iH, 0.25 * hands[iH]!)]!;
+    expect(oldFinish - ev.contact).toBeLessThan(0.1);
+    expect(r.events.finish! - ev.contact).toBeGreaterThan(0.15);
+    expect(Math.abs(r.events.finish! - ev.finish)).toBeLessThan(0.02);
+  });
+
+  it('reports a clip that ends before contact', () => {
+    const { seq } = loadFixture('batting-240fps');
+    const cut = battingTruth(1).handPeak + 0.03;
+    const r = analyzeBatting({ ...seq, frames: seq.frames.filter((f) => f.t <= cut) });
+    expect(r.failure).toBe('events_not_found');
+    expect(r.quality.warnings).toContain('contact_not_in_clip');
   });
 
   it('uses manually corrected events', () => {
