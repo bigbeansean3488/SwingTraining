@@ -41,6 +41,6 @@
 
 ## 開發指令
 - Node 在 `C:/Program Files/nodejs`（Git Bash：`export PATH="/c/Program Files/nodejs:$PATH"`）。
-- `npm run dev`：開發伺服器。`npm run check`：lint + 型別 + 測試 + 建置（CI 同步）。
+- `npm run dev`：開發伺服器。`npm run check`：lint + 格式 + 型別 + 測試 + 建置（與 CI 相同）。
 - `npm test`、`npm run typecheck`、`npm run lint`、`npm run format`。
 - `node scripts/make-fixtures.mjs`：重新產生 `tests/fixtures/` 的合成關鍵點。

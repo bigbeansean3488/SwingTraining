@@ -5,3 +5,4 @@ public/mediapipe
 package-lock.json
 coverage
 *.md
+.vitest
