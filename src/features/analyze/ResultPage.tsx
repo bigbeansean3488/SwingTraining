@@ -13,6 +13,7 @@ import { analysisTimes, formatDateTime } from '../../lib/analysisTime';
 import { unpackKeypoints } from '../../lib/compress';
 import { deleteBlob, deleteRow, getBlob, updateRow } from '../../lib/db';
 import { downloadText } from '../../lib/download';
+import { SOLO } from '../../lib/edition';
 import { useRow, useRows } from '../../lib/hooks';
 import { navigate } from '../../lib/router';
 import type { MotionAnalysis } from '../../lib/types';
@@ -259,7 +260,7 @@ export function ResultPage({ id }: { id: string }) {
       {row.quality.ok ? (
         <SummaryCard row={row} references={references} refCount={refRows?.length ?? 0} />
       ) : null}
-      {row.quality.ok ? <ReferenceCard row={row} /> : null}
+      {row.quality.ok && !SOLO ? <ReferenceCard row={row} /> : null}
 
       <Card title="骨架疊圖">
         {seq ? (
@@ -658,8 +659,9 @@ function useKeyframeUrls(keyframes: MotionAnalysis['keyframes'] | undefined) {
       const out: Record<string, string> = {};
       for (const k of keyframes) {
         const b = k.blob_key ? await getBlob(k.blob_key) : undefined;
+        // Cloud copies need Supabase; the env check is inline so the solo build drops that chunk.
         if (b) out[k.event] = URL.createObjectURL(b);
-        else if (k.path) {
+        else if (k.path && import.meta.env.VITE_EDITION !== 'solo') {
           const { keyframeUrl } = await import('../../lib/storage');
           const u = await keyframeUrl(k.path);
           if (u) out[k.event] = u;

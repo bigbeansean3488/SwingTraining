@@ -8,16 +8,20 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:solo": "vite --mode solo",
     "build": "vite build",
+    "build:solo": "vite build --mode solo",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build && npm run build:solo",
     "postinstall": "node scripts/copy-mediapipe.mjs",
     "prebuild": "node scripts/copy-mediapipe.mjs",
+    "prebuild:solo": "node scripts/copy-mediapipe.mjs",
+    "predev:solo": "node scripts/copy-mediapipe.mjs",
     "predev": "node scripts/copy-mediapipe.mjs"
   },
   "dependencies": {

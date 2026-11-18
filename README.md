@@ -60,6 +60,23 @@ npm run check      # lint + 型別檢查 + 測試 + 建置（與 CI 相同）
 
 **做完請回報**：部署後的網址，以及手機能否開啟首頁、能否加入主畫面。
 
+## 部署對外的單獨分析版（選用，需要你本人操作）
+
+給球隊以外的人用的版本（D27）：只有打擊／投球分析，沒有登入、球隊、訓練、比賽功能，不連 Supabase，資料只存在使用者自己的手機。跟球隊版用同一個儲存庫，合併到 `main` 時兩個網址會一起更新。
+
+1. Cloudflare → **Workers & Pages** → **Create application** → **Pages** → **Import an existing Git repository**，再選一次 `SwingTraining`。
+2. 填寫：
+   - **Project name**：例如 `ncku-swing`（網址 `https://ncku-swing.pages.dev`，跟球隊版不同）
+   - **Production branch**：`main`
+   - **Framework preset**：`None`
+   - **Build command**：`npm run build:solo`
+   - **Build output directory**：`dist`
+   - **Environment variables**：**不要填**任何 Supabase 變數（填了也不會用到）。
+3. **Save and Deploy**，再到 **Settings** → **Builds** → **Branch control** 把 **Preview branch** 改成 **None**。
+4. 注意：兩個專案共用每月 500 次的免費建置額度，每次合併到 `main` 會用掉 2 次。
+
+**做完請回報**：單獨版的網址，以及另一支沒登入過的手機能否打開、分析一支影片、匯出備份檔。
+
 ## 設定 Supabase（階段 2，需要你本人操作）
 
 見 [`docs/SETUP_SUPABASE.md`](docs/SETUP_SUPABASE.md)。沒設定 Supabase 時，App 以「本機模式」運作：所有功能都能用，資料只存在這支手機。

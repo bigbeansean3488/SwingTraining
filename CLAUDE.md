@@ -41,6 +41,7 @@
 
 ## 開發指令
 - Node 在 `C:/Program Files/nodejs`（Git Bash：`export PATH="/c/Program Files/nodejs:$PATH"`）。
-- `npm run dev`：開發伺服器。`npm run check`：lint + 格式 + 型別 + 測試 + 建置（與 CI 相同）。
+- `npm run dev`：開發伺服器。`npm run check`：lint + 格式 + 型別 + 測試 + 兩個版本的建置（與 CI 相同）。
+- `npm run dev:solo`／`npm run build:solo`：對外的單獨分析版（D27），入口 `src/SoloApp.tsx`，以 `SOLO`（`src/lib/edition.ts`）區分；單獨版不可載入 Supabase、球隊功能或標竿動作。
 - `npm test`、`npm run typecheck`、`npm run lint`、`npm run format`。
 - `node scripts/make-fixtures.mjs`：重新產生 `tests/fixtures/` 的合成關鍵點。
