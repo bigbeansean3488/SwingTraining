@@ -198,5 +198,15 @@
 - 為什麼不選其他做法：直接給現在的網址（A）會看到用不到的球隊功能；把引擎拆成獨立套件、兩個專案（C）維護成本高，現在不需要。
 - 仍要遵守：不做評分、傷害或醫療判斷；回饋只跟自己比較；沒有對外公開的球員頁面（資料不離開使用者的手機）。
 - 授權：研究樣本來自 OBP（CC BY-NC-SA 4.0），單獨版「更多」頁附出處，並註明只可非商業使用、職業運動組織或金融分析公司的員工、約聘人員或大股東不得使用。
-- 隱私說明：MediaPipe（tasks-vision 1.2.3）會每 60 秒把執行統計（辨識種類、執行模式、處理速度）POST 到 `odml.pa.googleapis.com/v1/log`，程式碼中沒有關閉選項；依程式碼看不含影像。單獨版「更多」頁已說明。球隊版同樣有這個行為。
+- 隱私說明：MediaPipe（tasks-vision 1.2.3）會每 60 秒把執行統計（辨識種類、執行模式、處理速度）POST 到 `odml.pa.googleapis.com/v1/log`，程式碼中沒有關閉選項；依程式碼看不含影像。球隊版同樣有這個行為。單獨版已擋掉，見 D28。
 - 限制：資料只在使用者的瀏覽器，清除資料或 iPhone 長期未開啟可能遺失；靠使用者自己匯出備份。
+
+## D28：單獨版擋掉 MediaPipe 執行統計（2026-11-18）
+- 背景：見 D27 隱私說明。單獨版要給球隊以外的人用，使用者 2026-11-18 決定擋掉。
+- 做法：單獨版的 `index.html` 加上 `Content-Security-Policy` meta（`vite.config.ts` 的 `SOLO_CSP`），只限制連線：`connect-src 'self' https://storage.googleapis.com blob: data:`。程式、圖片、樣式不受限制。
+  - 允許的是自己的網站（程式、wasm 執行檔）與 Google 的模型下載位置（`.task` 模型檔）；`odml.pa.googleapis.com` 不在名單內，瀏覽器直接拒絕連線。
+  - MediaPipe 的統計模組送出失敗後會停止計時器、不再重試（tasks-vision 1.2.3 `vision_bundle.mjs`），所以每次載入辨識器最多在主控台留一行錯誤，不影響分析。
+  - 用 meta 而不是 Cloudflare `_headers`：兩個版本共用 `public/`，meta 只會出現在單獨版的建置裡，`npm run dev:solo` 也能測到。
+- 不改程式庫本身、不攔截 `fetch`，以後升級 MediaPipe 也不用跟著改。
+- 球隊版不變（隊內使用，維持 D5 的做法）。如果之後要新增別的連線（例如其他模型位置），要一起改 `SOLO_CSP`。
+- 桌機確認（2026-11-18，`npm run dev:solo`，Chrome）：分析 Conforto 測試片正常完成；主控台顯示 CSP 擋下 `odml.pa.googleapis.com/v1/log`，網路紀錄沒有這個請求；從頁面下載 lite 模型仍成功（200，5.7 MB）。

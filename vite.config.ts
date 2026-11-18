@@ -19,6 +19,9 @@ const EDITIONS = {
   },
 };
 
+const SOLO_CSP =
+  '<meta http-equiv="Content-Security-Policy" content="connect-src \'self\' https://storage.googleapis.com blob: data:" />';
+
 export default defineConfig(({ mode }) => {
   const solo = mode === 'solo';
   const edition = solo ? EDITIONS.solo : EDITIONS.team;
@@ -40,7 +43,14 @@ export default defineConfig(({ mode }) => {
       react(),
       {
         name: 'edition-title',
-        transformIndexHtml: (html: string) => html.replaceAll('球隊訓練', edition.shortName),
+        transformIndexHtml: (html: string) => {
+          html = html.replaceAll('球隊訓練', edition.shortName);
+          // Solo app: the page may only connect to itself and Google's model bucket.
+          // This blocks MediaPipe's usage-statistics upload (odml.pa.googleapis.com);
+          // its logger stops after the first failed send. See docs/DECISIONS.md D28.
+          const charset = '<meta charset="UTF-8" />';
+          return solo ? html.replace(charset, `${charset}\n    ${SOLO_CSP}`) : html;
+        },
       },
       VitePWA({
         registerType: 'autoUpdate',

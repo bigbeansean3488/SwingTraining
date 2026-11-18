@@ -187,8 +187,9 @@ function StorageCard() {
         。結果只存在這個瀏覽器裡，沒有帳號，也不會同步到其他裝置。
       </p>
       <p className="small muted">
-        骨架辨識元件（Google MediaPipe）會定期把執行統計（用了哪種辨識、處理速度）傳給
-        Google；依程式碼來看不含影像。
+        這個網頁只會連到自己的網站和 Google
+        的模型下載位置（第一次分析時下載骨架辨識模型）。骨架辨識元件（Google
+        MediaPipe）原本會定期把執行統計傳給 Google，這個版本已經擋掉。
       </p>
       <p>
         清除瀏覽器資料、刪除主畫面上的 App，或 iPhone 長時間沒打開，資料都可能被刪掉。
