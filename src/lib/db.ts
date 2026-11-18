@@ -1,9 +1,11 @@
 // Local-first database on IndexedDB. Every write is recorded in an outbox that
 // the sync engine (src/lib/sync.ts) pushes to Supabase when online.
 import { openDB, type IDBPDatabase } from 'idb';
+import { SOLO } from './edition';
 import { TABLES, type BaseRow, type RowByTable, type TableName } from './types';
 
-const DB_NAME = 'team-platform';
+// Separate database for the stand-alone app (also keeps them apart on localhost).
+const DB_NAME = SOLO ? 'motion-analysis' : 'team-platform';
 // 2: reference_motions store.
 const DB_VERSION = 2;
 
@@ -22,6 +24,10 @@ export function subscribe(fn: Listener): () => void {
 }
 function emit(table: TableName | 'meta' | 'outbox') {
   for (const fn of listeners) fn(table);
+}
+/** Tell subscribers a table changed (after writing to it directly through `db()`). */
+export function notifyChanged(table: TableName): void {
+  emit(table);
 }
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -91,7 +97,9 @@ export async function saveRow<T extends TableName>(
   } as RowByTable[T];
   const tx = d.transaction([table, 'outbox'], 'readwrite');
   await tx.objectStore(table).put(row);
-  await tx.objectStore('outbox').add({ table, id: row.id, queued_at: now } satisfies OutboxItem);
+  // The stand-alone analysis app never syncs, so nothing is queued.
+  if (!SOLO)
+    await tx.objectStore('outbox').add({ table, id: row.id, queued_at: now } satisfies OutboxItem);
   await tx.done;
   emit(table);
   emit('outbox');

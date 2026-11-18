@@ -33,3 +33,5 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Build (stand-alone analysis app)
+        run: npm run build:solo
