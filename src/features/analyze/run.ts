@@ -4,6 +4,7 @@ import type { AnalysisResult, EventTimes, MotionKind, PoseSequence } from '../..
 import { packKeypoints } from '../../lib/compress';
 import { deleteBlob, putBlob, saveRow, setMeta, updateRow, uuid } from '../../lib/db';
 import type { CaptureInfo, KeyframeRef, MotionAnalysis } from '../../lib/types';
+import { blobReader, readFilmedAt } from '../../lib/videoMeta';
 import {
   extractPoses,
   seekTo,
@@ -75,9 +76,12 @@ export async function runAnalysis(p: RunParams): Promise<MotionAnalysis> {
     videoKey = `video:${id}`;
     await putBlob(videoKey, p.file);
   }
+  const filmedAt = await readFilmedAt(blobReader(p.file), p.file.size).catch(() => null);
   const capture: CaptureInfo = {
     fileName: p.file.name,
     fileSize: p.file.size,
+    filmedAt,
+    fileLastModified: p.file.lastModified ? new Date(p.file.lastModified).toISOString() : null,
     sourceFps: p.probe.fps,
     analyzedFps: result.quality.fps,
     width: ex.seq.width,
@@ -102,7 +106,9 @@ export async function runAnalysis(p: RunParams): Promise<MotionAnalysis> {
     player_id: p.playerId,
     team_id: p.teamId,
     kind: p.kind,
-    recorded_at: new Date(p.file.lastModified || Date.now()).toISOString(),
+    // Filming time from the video header; the phone's file time is often not
+    // the filming time, so fall back to the analysis time.
+    recorded_at: filmedAt ?? new Date().toISOString(),
     capture,
     fps: result.quality.fps,
     model_version: ex.modelVersion,

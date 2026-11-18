@@ -5,7 +5,7 @@ import type { Tracks } from './tracks';
 import { argmax, derivative, isNum, mean, median, percentile } from './signal';
 import type { MetricResult } from './types';
 
-export const ENGINE_VERSION = '1.2.0';
+export const ENGINE_VERSION = '1.3.0';
 
 export const DEFAULT_POSITION_CUTOFF_HZ = 12;
 export const DEFAULT_SPEED_CUTOFF_HZ = 20;

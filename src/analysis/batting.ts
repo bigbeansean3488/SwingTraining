@@ -19,18 +19,30 @@ import {
 import { angleAt, leanFromVertical } from './geometry';
 import { LM } from './landmarks';
 import { assessClip, windowValidFraction } from './quality';
-import { argmax, isNum } from './signal';
-import { buildTracks, indexAt } from './tracks';
+import { argmax, isNum, subSamplePeakTime } from './signal';
+import { buildTracks, indexAt, indexAtOrAfter } from './tracks';
 import type { AnalysisOptions, AnalysisResult, EventTimes, Metrics, PoseSequence } from './types';
 
 export const BATTING_EVENTS = ['stance', 'load', 'plant', 'contact', 'finish'] as const;
 
 /**
- * Contact = hand-speed peak + this delay. The hands slow down before the bat
+ * Contact = hand-speed peak (refined between frames) + contactDelay(fps), then
+ * the first frame at or after that time. The hands slow down before the bat
  * meets the ball; in the OBP lab data contact follows the hand-speed peak by a
- * median 61 ms (P10–P90 53–69 ms). See docs/METRICS.md §2.1.
+ * median 61 ms (P10–P90 53–69 ms). The delay is set so the contact frame
+ * already shows the ball hit in about 90% of swings at any frame rate.
+ * Rounding up to a frame already adds part of a frame at low frame rates, so
+ * the delay shrinks there. See docs/METRICS.md §2.1.
  */
-export const CONTACT_AFTER_HAND_PEAK_S = 0.06;
+export const CONTACT_DELAY_MAX_S = 0.069;
+/** Part of one frame interval taken off the delay, capped by CONTACT_DELAY_FRAME_CAP_S. */
+export const CONTACT_DELAY_FRAME_SHARE = 0.15;
+export const CONTACT_DELAY_FRAME_CAP_S = 0.007;
+
+/** Delay from the hand-speed peak to contact (s) at sampling rate `fs` (frames/s, real time). */
+export function contactDelay(fs: number): number {
+  return CONTACT_DELAY_MAX_S - Math.min(CONTACT_DELAY_FRAME_CAP_S, CONTACT_DELAY_FRAME_SHARE / fs);
+}
 /** Finish: hand speed below this fraction of the swing peak, after the follow-through. */
 export const FINISH_FRACTION = 0.2;
 /** The follow-through hand-speed peak is searched this long after contact. */
@@ -60,11 +72,11 @@ export function analyzeBatting(seq: PoseSequence, opts: AnalysisOptions = {}): A
 
   // --- Event detection -----------------------------------------------------
   const iH = argmax(hands);
-  const tC = iH >= 0 ? tr.t[iH]! + CONTACT_AFTER_HAND_PEAK_S : NaN;
+  const tC = iH >= 0 ? subSamplePeakTime(tr.t, hands, iH) + contactDelay(tr.fs) : NaN;
   const warnings = [...quality.warnings];
   let iC = -1;
-  if (iH >= 0 && tC <= tr.t[tr.n - 1]!) iC = indexAt(tr, tC);
-  else if (iH >= 0) warnings.push('contact_not_in_clip');
+  if (iH >= 0) iC = indexAtOrAfter(tr, tC);
+  if (iH >= 0 && iC < 0) warnings.push('contact_not_in_clip');
   // Stride: ankle speed peak before the hands peak; plant must come before contact.
   const iA = argmax(ankle, 0, iH);
   let iP =

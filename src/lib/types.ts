@@ -137,6 +137,13 @@ export interface TrainingLog extends BaseRow {
 export interface CaptureInfo {
   fileName: string | null;
   fileSize: number | null;
+  /** Filming time from the video header (moov/mvhd), ISO; null if absent. */
+  filmedAt?: string | null;
+  /**
+   * File modification time reported by the phone (ISO). Not reliably the
+   * filming time. Since 2026-11-18 recorded_at = filmedAt, else analysis time.
+   */
+  fileLastModified?: string | null;
   sourceFps: number | null;
   analyzedFps: number;
   width: number;

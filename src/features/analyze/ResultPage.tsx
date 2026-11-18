@@ -9,6 +9,7 @@ import {
 import { metricFigures, type FigureSet } from '../../analysis/figures';
 import type { EventTimes, PoseSequence } from '../../analysis/types';
 import { sameDefinitions } from '../../analysis/versions';
+import { analysisTimes, formatDateTime } from '../../lib/analysisTime';
 import { unpackKeypoints } from '../../lib/compress';
 import { deleteBlob, deleteRow, getBlob, updateRow } from '../../lib/db';
 import { downloadText } from '../../lib/download';
@@ -144,6 +145,7 @@ export function ResultPage({ id }: { id: string }) {
 
   const labels = EVENT_LABELS[row.kind];
   const outdated = row.engine_version !== ENGINE_VERSION;
+  const times = analysisTimes(row);
 
   async function mark(event: string, t: number) {
     if (!row || !seq) return;
@@ -194,7 +196,13 @@ export function ResultPage({ id }: { id: string }) {
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div>
             <div className="list-title">{player?.display_name ?? '—'}</div>
-            <div className="muted small">{new Date(row.recorded_at).toLocaleString('zh-TW')}</div>
+            <div className="muted small">
+              拍攝時間：
+              {times.filmed
+                ? `${formatDateTime(times.filmed)}${times.filmedSource === 'file' ? '（影片沒有記錄，這是手機的檔案時間，可能不準）' : ''}`
+                : '不明（影片沒有記錄）'}
+            </div>
+            <div className="muted small">分析時間：{formatDateTime(times.analyzed)}</div>
           </div>
           {row.quality.ok ? (
             <Badge kind="ok">追蹤良好</Badge>

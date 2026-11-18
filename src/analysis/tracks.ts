@@ -169,6 +169,13 @@ function resample(srcT: number[], values: number[], t: number[]): number[] {
   return t.map((tq) => interpAt(srcT, values, tq));
 }
 
+/** Index of the first uniform-grid sample at or after time `tq`; -1 if past the end. */
+export function indexAtOrAfter(tr: Tracks, tq: number): number {
+  if (!tr.n) return -1;
+  const i = Math.max(0, Math.ceil((tq - tr.t[0]!) * tr.fs - 1e-6));
+  return i < tr.n ? i : -1;
+}
+
 /** Index of the uniform-grid sample nearest to time `tq`. */
 export function indexAt(tr: Tracks, tq: number): number {
   if (!tr.n) return -1;
